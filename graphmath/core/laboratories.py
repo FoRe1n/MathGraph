@@ -67,7 +67,11 @@ def default_project() -> Project:
 def identify(function: Function | None) -> str:
     if function:
         for key,lab in LABS.items():
-            if function.expression == lab.expression and all(c.name in function.parameters for c in lab.controls):
+            if (function.expression == lab.expression and set(function.parameters)=={c.name for c in lab.controls}
+                and all(math.isclose(function.parameters[c.name].minimum,c.minimum)
+                        and math.isclose(function.parameters[c.name].maximum,c.maximum)
+                        and math.isclose(function.parameters[c.name].step,c.step)
+                        and math.isclose(function.parameters[c.name].initial,c.default) for c in lab.controls)):
                 values={n:p.value for n,p in function.parameters.items()}
                 if all(c.minimum <= values[c.name] <= c.maximum and math.isclose(c.clamp(values[c.name]),values[c.name],abs_tol=1e-8) and (not c.base or values[c.name]>0 and not math.isclose(values[c.name],1)) for c in lab.controls):
                     return key

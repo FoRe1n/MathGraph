@@ -190,3 +190,17 @@ def test_hidden_lab_is_preserved_and_can_be_shown(lab,qtbot):
     assert not function.visible and lab.learning.show_graph.isVisible()
     qtbot.mouseClick(lab.learning.show_graph,Qt.LeftButton)
     assert function.visible and not lab.learning.show_graph.isVisible()
+
+
+def test_entering_lab_preserves_custom_parameter_limits(lab,tmp_path):
+    from graphmath.persistence.projects import Project,Function,Parameter
+    custom=Function('a*x^2+b*x+c',parameters={n:Parameter() for n in ['a','b','c']})
+    lab.project=Project(functions=[custom],selected=custom.id)
+    lab.reset_document()
+    assert lab.mode=='custom'
+    choose(lab,'quadratic')
+    assert lab.current_function().id!=custom.id
+    lab.learning.controls['b'].value.setValue(8)
+    lab.path=str(tmp_path/'separate-parameters.graphmath')
+    assert lab.save_project()
+    assert custom.parameters['b'].maximum==5 and custom.parameters['b'].value==1

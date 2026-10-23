@@ -108,3 +108,9 @@ def test_reset_views_follow_current_function():
         assert view[0]<x<view[1] and view[2]<y<view[3]
     view=suggested_view('logarithmic',{'a':-2,'b':.5,'h':4,'k':5})
     assert view[0]<4<view[1] and view[2]<5<view[3]
+
+
+def test_custom_coefficient_bounds_are_not_mistaken_for_lab_defaults():
+    from graphmath.persistence.projects import Function,Parameter
+    f=Function('a*x^2+b*x+c',parameters={n:Parameter() for n in ['a','b','c']})
+    assert identify(f)=='custom'

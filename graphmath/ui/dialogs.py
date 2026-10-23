@@ -62,6 +62,7 @@ class SettingsDialog(QDialog):
         self.error.setWordWrap(True)
         layout.addRow(self.error)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText('Застосувати')
         buttons.accepted.connect(self.validate)
         buttons.rejected.connect(self.reject)
         layout.addRow(buttons)

@@ -57,7 +57,7 @@ interaction and hardware FPS are separate from offscreen validation.
 
 ## Validated PR candidate
 
-All **143 tests passed** locally after the final changes. Source smoke passed all
+All **145 tests passed** locally after the final changes. Source smoke passed all
 three learning modes, project serialization, preserved background analysis and
 PNG/SVG/PDF export. A Linux onedir MathLab build passed required-resource validation
 and frozen startup, including the symbolic subprocess. Native Windows and release
@@ -67,3 +67,5 @@ The final offscreen five-function pan + forced raster median was **13.792 ms**
 (p95 14.791 ms); wheel + raster median **13.223 ms**. A 5,000-step interaction run
 kept one curve/cache entry and showed **zero RSS growth** after settling and garbage
 collection (16.99 seconds of scripted interaction). It is not an hours-long test.
+
+A custom formula with the same algebraic form as a laboratory retains its own parameter bounds. Entering a laboratory creates an independent record when those bounds differ; this is covered by core and GUI regression tests.
