@@ -50,6 +50,8 @@ def test_expression_edit_template_and_error(window,qtbot):
     qtbot.keyClicks(row.input,'x.__class__')
     qtbot.wait(350)
     assert row.error.isVisible()
+    row.preview.resize(200, 40)
+    assert row.preview.pixmap().isNull()
     row.input.selectAll()
     window.insert_math('sin(x)',4,1)
     window.flush_inputs()

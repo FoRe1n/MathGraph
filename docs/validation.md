@@ -33,3 +33,13 @@ proof of a successful Windows build or published release.
 - Third-party deprecation warnings from Matplotlib/pyparsing and PyQtGraph were
   observed; they did not fail tests. Qt offscreen tests do not replace physical
   mouse/display or native Windows visual QA.
+
+## Native Windows validation
+
+Windows Actions run [39970755377](https://github.com/FoRe1n/MathGraph/actions/runs/39970755377)
+completed the 79-case suite, source smoke, PyInstaller build, packaged-resource
+verification, frozen EXE smoke (including symbolic subprocess), and portable ZIP
+creation successfully. Final pole-factor and stale-preview regressions increase
+the source suite to 81 tests. Release-tag CI reruns all checks on the tagged commit
+before publishing. Physical Windows 10/11 desktop visual QA and code signing are
+not performed by this Linux task.

@@ -67,3 +67,10 @@ def test_parser_complexity_limits():
     for source in ['x+' * 400 + 'x', 'sin(' * 30 + 'x' + ')' * 30]:
         with pytest.raises(ExpressionError):
             parse(source)
+
+
+@pytest.mark.parametrize("source", ["1e-14/(x-0.123)^2", "1e-14/abs(x-0.123)"])
+def test_small_even_poles_are_segmented(source):
+    x, y = sample(source, -1, 1, yrange=(-1, 1))
+    crossing = (x[:-1] < .123) & (x[1:] > .123)
+    assert not np.any(np.isfinite(y[:-1][crossing]) & np.isfinite(y[1:][crossing]))

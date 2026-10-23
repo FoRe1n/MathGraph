@@ -43,6 +43,18 @@ class _Parser:
         self.positive: list[sp.Expr] = []
         self.parameters: set[str] = set()
 
+    def denominator(self, expression: sp.Expr):
+        """Retain zero factors, including even poles too small for jump heuristics."""
+        if expression not in self.denominators:
+            self.denominators.append(expression)
+        if isinstance(expression, sp.Mul):
+            for factor in expression.args:
+                self.denominator(factor)
+        elif isinstance(expression, sp.Pow) and expression.exp.is_number and expression.exp != 0:
+            self.denominator(expression.base)
+        elif isinstance(expression, sp.Abs):
+            self.denominator(expression.args[0])
+
     def visit(self, node: ast.AST, depth: int = 0) -> sp.Expr:
         if depth > MAX_DEPTH:
             raise ExpressionError("Вираз надто вкладений. Спростіть його.")
@@ -72,7 +84,7 @@ class _Parser:
             if isinstance(node.op, ast.Div):
                 if right == 0:
                     raise ExpressionError("Ділення на нуль не визначено.")
-                self.denominators.append(right)
+                self.denominator(right)
                 return sp.Mul(left, sp.Pow(right, -1, evaluate=False), evaluate=False)
             # Numeric exponents only: bounded complexity and predictable real domains.
             if right.free_symbols or sp.count_ops(right) > 3:
@@ -81,7 +93,7 @@ class _Parser:
             elif abs(float(right)) > 100:
                 raise ExpressionError("Показник степеня має бути від −100 до 100.")
             if right.is_negative:
-                self.denominators.append(left)
+                self.denominator(left)
             if right.is_integer is not True and right != X:
                 self.nonnegative.append(left)
             return sp.Pow(left, right, evaluate=False)

@@ -44,6 +44,10 @@ class FormulaLabel(QLabel):
         except Exception:
             self.clear()
 
+    def clear(self):
+        self.original = None
+        super().clear()
+
     def fit_preview(self):
         if self.original is not None:
             logical = self.original.deviceIndependentSize()
