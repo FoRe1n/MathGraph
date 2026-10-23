@@ -43,3 +43,28 @@ creation successfully. Final pole-factor and stale-preview regressions increase
 the source suite to 81 tests. Release-tag CI reruns all checks on the tagged commit
 before publishing. Physical Windows 10/11 desktop visual QA and code signing are
 not performed by this Linux task.
+
+## Published release verification
+
+[Release-tag run 39971378185](https://github.com/FoRe1n/MathGraph/actions/runs/39971378185)
+succeeded on commit `e62c843ad458a3a6ee77712c869cf984fc8d86fc`. Both the Windows
+build and release jobs completed successfully. The final suite contains 81 cases;
+source and frozen EXE smoke checks, resource verification and ZIP packaging passed.
+
+GitHub confirms the public, non-draft [GraphMath v1.0.0 release](https://github.com/FoRe1n/MathGraph/releases/tag/v1.0.0)
+with `GraphMath-v1.0.0-Windows-x64.zip` and `SHA256SUMS.txt` uploaded. An anonymous
+HTTP request downloaded the complete 92,132,745-byte ZIP with HTTP 200. Its digest
+matches the published checksum:
+
+```
+00cd1803f88af4234b1a420210801ea6580649534f8fbfbfec8e8795370aab74
+```
+
+All 1,483 archive entries passed ZIP CRC checks; the EXE has a Windows PE/MZ header,
+and qwindows.dll, DejaVu MathText fonts, LGPL text and the dependency license inventory
+are present. The executable was exercised on the native Windows CI runner; it was
+not executed on this Linux machine. Physical Windows desktop interaction remains
+unverified. The source screenshots in this repository were visually reviewed from
+actual offscreen Qt on Linux. Downloading the separate Windows screenshot evidence
+artifact from Azure storage was denied by the cloud egress proxy; this did not affect
+Windows runner validation, release publication, or the public ZIP download.

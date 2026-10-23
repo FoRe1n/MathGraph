@@ -10,12 +10,16 @@ or CS2 Optimizer.
 
 ## Windows download
 
-Published builds appear at [GitHub Releases](https://github.com/FoRe1n/MathGraph/releases).
-Download `GraphMath-v1.0.0-Windows-x64.zip`, extract the **entire folder**, and open
-`GraphMath.exe`. Windows 10/11 x64; no Python, account or network connection required.
-Do not move the EXE away from its `_internal` folder. Builds are unsigned.
-The existence and status of a release must be checked on GitHub; a source checkout
-alone does not establish that a Windows build is available.
+Download **[GraphMath v1.0.0 for Windows x64 (ZIP)](https://github.com/FoRe1n/MathGraph/releases/download/v1.0.0/GraphMath-v1.0.0-Windows-x64.zip)**
+([release notes and SHA256](https://github.com/FoRe1n/MathGraph/releases/tag/v1.0.0)).
+Extract the **entire folder** and open `GraphMath.exe`. Windows 10/11 x64;
+no Python, account or network connection required. Do not move the EXE away from
+its `_internal` folder. The portable build is unsigned.
+
+[Native Windows CI](https://github.com/FoRe1n/MathGraph/actions/runs/39971378185)
+passed all 81 tests, source/frozen startup checks and resource verification before
+publication. The public download was independently downloaded and its SHA256 and
+ZIP integrity verified. See [validation details](docs/validation.md).
 
 ## Features
 
