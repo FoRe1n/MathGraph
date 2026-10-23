@@ -5,6 +5,8 @@ import ast
 from dataclasses import dataclass
 from functools import lru_cache
 import re
+import io
+import tokenize
 
 import numpy as np
 import sympy as sp
@@ -131,6 +133,30 @@ class _Parser:
         raise ExpressionError("Використовуйте лише числа, x, математичні операції та дозволені функції.")
 
 
+def normalize(source: str) -> str:
+    """Unambiguous school notation; unknown names remain intact for rejection."""
+    text=source.strip().replace('−','-').replace('×','*').replace('·','*').replace('÷','/').replace('π','pi')
+    superscripts=str.maketrans('⁰¹²³⁴⁵⁶⁷⁸⁹⁻','0123456789-')
+    text=re.sub(r'[⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+',lambda m:'**('+m.group().translate(superscripts)+')',text)
+    text=text.replace('^','**')
+    if re.match(r'^y\s*=',text):text=text.split('=',1)[1].strip()
+    try:
+        tokens=[t for t in tokenize.generate_tokens(io.StringIO(text).readline)
+                if t.type not in (tokenize.ENDMARKER,tokenize.NEWLINE,tokenize.NL)]
+        output=[]
+        for i,token in enumerate(tokens):
+            if i:
+                previous=tokens[i-1]
+                implicit=(previous.type==tokenize.NUMBER and (token.type==tokenize.NAME or token.string=='(')
+                          or previous.string==')' and (token.type in (tokenize.NAME,tokenize.NUMBER) or token.string=='(')
+                          or previous.type==tokenize.NAME and len(previous.string)==1 and token.string=='(')
+                if implicit:output.append('*')
+            output.append(token.string)
+        return ' '.join(output)
+    except (tokenize.TokenError,IndentationError):
+        raise ExpressionError('Перевірте дужки та знаки операцій.') from None
+
+
 @lru_cache(maxsize=256)
 def parse(source: str) -> Expression:
     """Parse explicit multiplication, ^ or ** powers, and an optional y= prefix."""
@@ -138,9 +164,7 @@ def parse(source: str) -> Expression:
         raise ExpressionError("Введіть функцію, наприклад x^2 − 4.")
     if len(source) > MAX_LENGTH:
         raise ExpressionError("Вираз задовгий (максимум 600 символів).")
-    normalized = source.strip().replace("−", "-").replace("π", "pi").replace("^", "**")
-    if re.match(r"^y\s*=", normalized):
-        normalized = normalized.split("=", 1)[1].strip()
+    normalized = normalize(source)
     try:
         tree = ast.parse(normalized, mode="eval")
         if sum(1 for _ in ast.walk(tree)) > MAX_NODES:

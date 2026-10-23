@@ -36,3 +36,11 @@ def test_intersections_and_parameters():
 def test_absolute_value_extremum():
     r=analyze('abs(x)')
     assert any(p['kind']=='мінімум' and p['x']==0 for p in r['extrema'])
+
+
+def test_display_notation_avoids_programming_set_names():
+    r=analyze('sqrt(x)')
+    assert 'Interval' not in r['display_properties']['Область визначення']
+    assert '∞' in r['display_properties']['Область визначення']
+    # The original programmatic property remains compatible.
+    assert 'Interval' in r['properties']['Область визначення']

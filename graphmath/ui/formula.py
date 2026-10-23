@@ -36,8 +36,14 @@ class FormulaLabel(QLabel):
 
     def update_expression(self, source, color):
         try:
+            self.update_latex(parse(source).latex, color)
+        except Exception:
+            self.clear()
+
+    def update_latex(self, latex, color, size=13):
+        try:
             image = QPixmap()
-            image.loadFromData(formula_png(parse(source).latex, color))
+            image.loadFromData(formula_png(latex, color, size))
             image.setDevicePixelRatio(1.4)
             self.original = image
             self.fit_preview()

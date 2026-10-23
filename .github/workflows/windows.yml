@@ -1,8 +1,8 @@
-name: Windows portable build
+name: MathLab Windows portable build
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['v*', 'mathlab-v*']
   pull_request:
   workflow_dispatch:
 
@@ -28,23 +28,27 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF_NAME -ne 'v1.0.0') { throw 'This source version builds v1.0.0 only' }
+          if ($env:GITHUB_REF_NAME -ne 'mathlab-v1.0.0') { throw 'This source version builds MathLab v1.0.0 only' }
       - name: Install verified locked dependencies
         run: python -m pip install --require-hashes -r requirements-windows.lock
       - name: Test mathematics, project files and desktop workflows
         run: python -m pytest -q --junitxml=artifacts/tests.xml
+      - name: Measure offscreen interactions
+        run: python scripts/benchmark_interaction.py --output artifacts/interaction-benchmark.json --frames 30
       - name: Source application smoke test
         run: python -m graphmath --smoke-test --smoke-output artifacts/source-smoke
+      - name: Capture actual learning workspace screenshots
+        run: python scripts/capture_mathlab_qa.py
       - name: Collect bundled license notices
         run: python scripts/collect_licenses.py build/licenses
       - name: Build portable application
         run: python -m PyInstaller --noconfirm --clean GraphMath.spec
       - name: Verify packaged resources
-        run: python scripts/verify_distribution.py dist/GraphMath
+        run: python scripts/verify_distribution.py dist/MathLab
       - name: Frozen application smoke test
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath dist/GraphMath/GraphMath.exe -ArgumentList '--smoke-test','--smoke-output','artifacts/frozen-smoke' -PassThru
+          $process = Start-Process -FilePath dist/MathLab/MathLab.exe -ArgumentList '--smoke-test','--smoke-output','artifacts/frozen-smoke' -PassThru
           if (-not $process.WaitForExit(90000)) { $process.Kill(); throw 'Frozen startup timed out' }
           if ($process.ExitCode -ne 0) { throw "Frozen smoke exit code: $($process.ExitCode)" }
           $result = Get-Content artifacts/frozen-smoke/result.json | ConvertFrom-Json
@@ -52,17 +56,17 @@ jobs:
       - name: Package portable ZIP
         shell: pwsh
         run: |
-          Copy-Item LICENSE,THIRD_PARTY_NOTICES.md dist/GraphMath/
-          Copy-Item docs/user-guide.uk.md dist/GraphMath/ПОСІБНИК.md
-          Compress-Archive -Path dist/GraphMath -DestinationPath GraphMath-v1.0.0-Windows-x64.zip
-          if ((Get-Item GraphMath-v1.0.0-Windows-x64.zip).Length -lt 1000000) { throw 'Archive is unexpectedly small' }
-          $hash = (Get-FileHash GraphMath-v1.0.0-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  GraphMath-v1.0.0-Windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.md dist/MathLab/
+          Copy-Item docs/user-guide.uk.md dist/MathLab/ПОСІБНИК.md
+          Compress-Archive -Path dist/MathLab -DestinationPath MathLab-v1.0.0-Windows-x64.zip
+          if ((Get-Item MathLab-v1.0.0-Windows-x64.zip).Length -lt 1000000) { throw 'Archive is unexpectedly small' }
+          $hash = (Get-FileHash MathLab-v1.0.0-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  MathLab-v1.0.0-Windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: GraphMath-v1.0.0-Windows-x64
+          name: MathLab-v1.0.0-Windows-x64
           path: |
-            GraphMath-v1.0.0-Windows-x64.zip
+            MathLab-v1.0.0-Windows-x64.zip
             SHA256SUMS.txt
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -72,7 +76,7 @@ jobs:
           path: artifacts/
           if-no-files-found: warn
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/mathlab-v')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -80,10 +84,10 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: GraphMath-v1.0.0-Windows-x64
+          name: MathLab-v1.0.0-Windows-x64
           path: release
       - name: Publish verified Windows release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "GraphMath $GITHUB_REF_NAME" --notes 'Portable Windows x64. Extract the ZIP and double-click GraphMath.exe. No Python installation is required. Includes Ukrainian UI, safe expression input, independent parameters, analysis, project files, PNG/SVG/PDF export, and light/dark themes. Unsigned build. See bundled user guide and license notices.' release/GraphMath-v1.0.0-Windows-x64.zip release/SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "MathLab v1.0.0" --notes 'Portable Windows x64. Extract the ZIP and double-click MathLab.exe. No Python installation is required. Includes quadratic, exponential and logarithmic laboratories, Ukrainian explanations, efficient raster rendering, custom functions, backward-compatible .graphmath projects, analysis, and PNG/SVG/PDF export. The GraphMath v1.0.0 release remains available. Unsigned build. See bundled user guide and license notices.' release/MathLab-v1.0.0-Windows-x64.zip release/SHA256SUMS.txt

@@ -58,3 +58,27 @@ colors, IDs, finite values, parameter limits, function count and viewport; files
 are limited to 2 MB. Function text remains inert on load and is later checked by
 the parser. Atomic same-directory replacement preserves an older save if writing
 fails. Global settings belong to QSettings (Windows user registry), not the project.
+
+## MathLab additions
+
+The existing parser, evaluator, sampler and symbolic algorithms are retained.
+`graphmath.core.laboratories` provides `LABS`, `default_project`, `explanation`,
+`markers`, `formula_latex` and `suggested_view` without Qt. A laboratory is an
+ordinary Function record with independent Parameter values. Exponential bases
+are parameters; logarithms use `a*log(x-h)/log(b)+k`, preserving the existing
+restricted parser while enforcing b > 0 and b ≠ 1 in the learning controls.
+Original domain guards still exclude x ≤ h even when a = 0.
+
+Safe normalization accepts Unicode powers and multiplication, numeric adjacency
+such as `2x`, and parentheses such as `2(x+1)`. It tokenizes into explicit operators
+before the same allowlisted AST visitor; names are never split heuristically and
+attribute/import/container syntax remains rejected. Decimal literals in custom
+expressions use a dot. Ukrainian Qt numeric controls use the locale's comma.
+
+Version-1 documents optionally store `mode` (`custom`, `quadratic`, `exponential`,
+`logarithmic`). Missing metadata means `custom`, preserving old projects with all
+visible curves. Mathematical records, colors, parameter definitions, IDs, view and
+atomic save semantics remain unchanged. Older GraphMath loaders ignore the added
+field. New Unicode/implicit custom syntax requires MathLab's new normalization.
+The original analysis `properties` API is preserved; `display_properties` adds
+readable Unicode mathematics for the desktop inspector.

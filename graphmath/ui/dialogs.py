@@ -1,13 +1,13 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QComboBox, QCheckBox, QSpinBox,
-    QDoubleSpinBox, QLineEdit, QDialogButtonBox, QLabel, QVBoxLayout, QFileDialog)
+    QDoubleSpinBox, QLineEdit, QDialogButtonBox, QLabel, QVBoxLayout, QFileDialog, QWidget, QPushButton)
 import re
 
 
 class SettingsDialog(QDialog):
     def __init__(self, parent, values):
         super().__init__(parent)
-        self.setWindowTitle("Налаштування GraphMath")
+        self.setWindowTitle("Налаштування MathLab")
         self.setMinimumWidth(380)
         layout = QFormLayout(self)
         self.theme = QComboBox()
@@ -17,9 +17,20 @@ class SettingsDialog(QDialog):
         self.grid = QCheckBox("Показувати сітку")
         self.grid.setChecked(values["grid"])
         layout.addRow(self.grid)
+        self.coordinates=QCheckBox('Показувати координати курсора')
+        self.coordinates.setChecked(values.get('coordinates',False))
+        layout.addRow(self.coordinates)
+        advanced_button=QPushButton('Додаткові налаштування ▾')
+        advanced_button.setCheckable(True)
+        layout.addRow(advanced_button)
+        advanced=QWidget()
+        advanced_layout=QFormLayout(advanced)
+        layout.addRow(advanced)
+        advanced.hide()
+        advanced_button.toggled.connect(advanced.setVisible)
         self.axes = QCheckBox("Показувати осі")
         self.axes.setChecked(values["axes"])
-        layout.addRow(self.axes)
+        advanced_layout.addRow(self.axes)
         self.precision = QSpinBox()
         self.precision.setRange(2, 10)
         self.precision.setValue(values["precision"])
@@ -27,10 +38,10 @@ class SettingsDialog(QDialog):
         self.scale = QComboBox()
         self.scale.addItems(["100%", "115%", "130%", "150%"])
         self.scale.setCurrentText(values["scale"])
-        layout.addRow("Масштаб тексту", self.scale)
+        advanced_layout.addRow("Масштаб тексту", self.scale)
         self.colors = QLineEdit(", ".join(values["colors"]))
         self.colors.setToolTip("Кольори нових функцій у форматі #RRGGBB, через кому")
-        layout.addRow("Палітра функцій", self.colors)
+        advanced_layout.addRow("Палітра функцій", self.colors)
         self.ranges = []
         for label, value in zip(["x мін.", "x макс.", "y мін.", "y макс."], values["default_view"]):
             spin = QDoubleSpinBox()
@@ -38,11 +49,14 @@ class SettingsDialog(QDialog):
             spin.setDecimals(3)
             spin.setValue(value)
             self.ranges.append(spin)
-            layout.addRow(label, spin)
+            advanced_layout.addRow(label, spin)
         hint = QLabel("Діапазон застосовується до поточного графіка та скидання виду.")
         hint.setWordWrap(True)
         hint.setObjectName("muted")
-        layout.addRow(hint)
+        advanced_layout.addRow(hint)
+        reset=QPushButton('Повернути типові налаштування')
+        reset.clicked.connect(self.reset_defaults)
+        layout.addRow(reset)
         self.error = QLabel()
         self.error.setObjectName("error")
         self.error.setWordWrap(True)
@@ -52,6 +66,14 @@ class SettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addRow(buttons)
 
+    def reset_defaults(self):
+        from graphmath.persistence.projects import COLORS
+        self.theme.setCurrentIndex(0)
+        self.grid.setChecked(True);self.axes.setChecked(True);self.coordinates.setChecked(False)
+        self.precision.setValue(5);self.scale.setCurrentText('100%')
+        self.colors.setText(', '.join(COLORS))
+        for spin,value in zip(self.ranges,[-6,6,-3,9]):spin.setValue(value)
+
     def validate(self):
         view = [s.value() for s in self.ranges]
         colors = [c.strip() for c in self.colors.text().split(",")]
@@ -60,7 +82,8 @@ class SettingsDialog(QDialog):
             return
         self.values = {"theme": "dark" if self.theme.currentIndex() else "light", "grid": self.grid.isChecked(),
                        "axes": self.axes.isChecked(), "precision": self.precision.value(),
-                       "scale": self.scale.currentText(), "colors": colors, "default_view": view}
+                       "scale": self.scale.currentText(), "colors": colors, "default_view": view,
+                       "coordinates":self.coordinates.isChecked()}
         self.accept()
 
 

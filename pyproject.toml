@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "graphmath"
 version = "1.0.0"
-description = "An offline mathematical graphing workspace"
+description = "MathLab: an offline interactive mathematics laboratory"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -20,6 +20,7 @@ dev = ["pytest==8.3.5", "pytest-qt==4.4.0", "pyinstaller==6.12.0"]
 
 [project.scripts]
 graphmath = "graphmath.app.main:main"
+mathlab = "graphmath.app.main:main"
 
 [tool.setuptools.packages.find]
 include = ["graphmath*"]

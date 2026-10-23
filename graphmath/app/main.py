@@ -9,7 +9,7 @@ import sys
 
 def main():
     multiprocessing.freeze_support()
-    parser = argparse.ArgumentParser(description="GraphMath 1.0")
+    parser = argparse.ArgumentParser(description="MathLab 1.0")
     parser.add_argument("project", nargs="?")
     parser.add_argument("--smoke-test", action="store_true", help="Launch, exercise exports and project I/O, then exit")
     parser.add_argument("--smoke-output", default="artifacts/smoke")
@@ -22,7 +22,9 @@ def main():
     from graphmath.ui.window import MainWindow
     app = QApplication(sys.argv[:1])
     app.setWindowIcon(QIcon(str(Path(__file__).resolve().parents[1] / "resources" / "icon.ico")))
-    app.setApplicationName("GraphMath")
+    app.setApplicationName("MathLab")
+    from graphmath.app.localization import install_ukrainian
+    install_ukrainian(app)
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("GraphMath")
     app.setStyle("Fusion")
@@ -48,6 +50,17 @@ def main():
                 save(window.project, output / "workspace.graphmath")
                 assert load(output / "workspace.graphmath").to_dict() == window.project.to_dict()
                 assert np.allclose(evaluate("x^2 - 4", np.array([-2., 0., 2.])), [0, -4, 0])
+                # Exercise the new laboratories, then the preserved custom-analysis path.
+                for mode, values in [('quadratic', {'a': 2., 'b': 0., 'c': -4.}),
+                                     ('exponential', {'a': 1., 'b': .5, 'c': 0.}),
+                                     ('logarithmic', {'a': 1., 'b': 2., 'h': 1., 'k': 0.})]:
+                    window.mode_selector.setCurrentIndex(window.mode_selector.findData(mode))
+                    for name,value in values.items():window.lab_coefficient_changed(name,value)
+                    window.canvas.flush_refresh()
+                    assert window.current_function().parameters['b'].value == values['b']
+                window.mode_selector.setCurrentIndex(window.mode_selector.findData('custom'))
+                window.edit_function(window.project.selected,'x^2 - 4')
+                window.canvas.refresh()
                 window.investigate()
                 loop = QEventLoop()
                 check = QTimer()
@@ -65,7 +78,8 @@ def main():
                 window.toggle_theme()
                 app.processEvents()
                 window.grab().save(str(output / "workspace-dark.png"))
-                (output / "result.json").write_text(json.dumps({"status": "passed", "version": "1.0.0", "exports": ["png", "svg", "pdf"], "project_roundtrip": True, "analysis_subprocess": True}), encoding="utf-8")
+                (output / "result.json").write_text(json.dumps({"status": "passed", "version": "1.0.0", "exports": ["png", "svg", "pdf"], "project_roundtrip": True, "analysis_subprocess": True, "laboratory_modes": ["quadratic", "exponential", "logarithmic"], "application": "MathLab"}), encoding="utf-8")
+                window.flush_inputs()
                 window.saved_state = window.serialized()
                 window.close()
                 app.exit(0)

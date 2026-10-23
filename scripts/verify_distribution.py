@@ -2,9 +2,9 @@
 from pathlib import Path
 import sys
 
-root = Path(sys.argv[1] if len(sys.argv)>1 else 'dist/GraphMath')
+root = Path(sys.argv[1] if len(sys.argv)>1 else 'dist/MathLab')
 windows = sys.platform == 'win32'
-required = [root / ('GraphMath.exe' if windows else 'GraphMath'),
+required = [root / (root.name+'.exe' if windows else root.name),
             root / '_internal' / 'LICENSE', root / '_internal' / 'THIRD_PARTY_NOTICES.md',
             root / '_internal' / 'licenses' / 'inventory.json']
 for path in required:
@@ -16,3 +16,6 @@ if not list(root.rglob(platform_plugin)):
 if not list(root.rglob('DejaVuSans.ttf')):
     raise SystemExit('Missing MathText fonts')
 print('Verified executable, Qt platform plugin, MathText fonts and notices.')
+
+if not list(root.rglob('qtbase_uk.qm')):
+    raise SystemExit('Missing Ukrainian Qt dialog translations')
