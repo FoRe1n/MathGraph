@@ -1,0 +1,9 @@
+# Direct dependencies pinned for Python 3.11+; complete platform locks are in requirements-*.lock.
+PySide6==6.8.3
+pyqtgraph==0.13.7
+sympy==1.13.3
+numpy==2.2.4
+matplotlib==3.10.1
+pytest==8.3.5
+pytest-qt==4.4.0
+pyinstaller==6.12.0

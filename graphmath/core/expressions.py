@@ -1,0 +1,186 @@
+"""Restricted mathematical AST -> SymPy. Never evaluate user source as Python."""
+from __future__ import annotations
+
+import ast
+from dataclasses import dataclass
+from functools import lru_cache
+import re
+
+import numpy as np
+import sympy as sp
+
+X = sp.Symbol("x", real=True)
+MAX_LENGTH = 600
+MAX_NODES = 100
+MAX_DEPTH = 18
+
+
+class ExpressionError(ValueError):
+    """A safe, user-readable input error."""
+
+
+@dataclass(frozen=True)
+class Expression:
+    source: str
+    symbolic: sp.Expr
+    parameters: tuple[str, ...]
+    denominators: tuple[sp.Expr, ...]
+    nonnegative: tuple[sp.Expr, ...]
+    positive: tuple[sp.Expr, ...]
+
+    @property
+    def latex(self) -> str:
+        return sp.latex(self.symbolic)
+
+    def substitute(self, values: dict[str, float]) -> sp.Expr:
+        return self.symbolic.subs({sp.Symbol(k, real=True): v for k, v in values.items()})
+
+
+class _Parser:
+    def __init__(self):
+        self.denominators: list[sp.Expr] = []
+        self.nonnegative: list[sp.Expr] = []
+        self.positive: list[sp.Expr] = []
+        self.parameters: set[str] = set()
+
+    def visit(self, node: ast.AST, depth: int = 0) -> sp.Expr:
+        if depth > MAX_DEPTH:
+            raise ExpressionError("Вираз надто вкладений. Спростіть його.")
+        child = lambda n: self.visit(n, depth + 1)
+        if isinstance(node, ast.Constant):
+            if type(node.value) not in (int, float) or not np.isfinite(node.value) or abs(node.value) > 1e12:
+                raise ExpressionError("Число має бути скінченним і не більшим за 10¹².")
+            return sp.Integer(node.value) if type(node.value) is int else sp.Float(node.value)
+        if isinstance(node, ast.Name):
+            if node.id in {"x", "pi", "e"}:
+                return {"x": X, "pi": sp.pi, "e": sp.E}[node.id]
+            if re.fullmatch("[a-df-wyz]", node.id):
+                self.parameters.add(node.id)
+                return sp.Symbol(node.id, real=True)
+            raise ExpressionError("Дозволено x, pi, e та однолітерні параметри a–z.")
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+            value = child(node.operand)
+            return value if isinstance(node.op, ast.UAdd) else sp.Mul(-1, value, evaluate=False)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow)):
+            left, right = child(node.left), child(node.right)
+            if isinstance(node.op, ast.Add):
+                return sp.Add(left, right, evaluate=False)
+            if isinstance(node.op, ast.Sub):
+                return sp.Add(left, sp.Mul(-1, right, evaluate=False), evaluate=False)
+            if isinstance(node.op, ast.Mult):
+                return sp.Mul(left, right, evaluate=False)
+            if isinstance(node.op, ast.Div):
+                if right == 0:
+                    raise ExpressionError("Ділення на нуль не визначено.")
+                self.denominators.append(right)
+                return sp.Mul(left, sp.Pow(right, -1, evaluate=False), evaluate=False)
+            # Numeric exponents only: bounded complexity and predictable real domains.
+            if right.free_symbols or sp.count_ops(right) > 3:
+                if right != X:
+                    raise ExpressionError("Степінь: число від −100 до 100 або x (наприклад 2^x).")
+            elif abs(float(right)) > 100:
+                raise ExpressionError("Показник степеня має бути від −100 до 100.")
+            if right.is_negative:
+                self.denominators.append(left)
+            if right.is_integer is not True and right != X:
+                self.nonnegative.append(left)
+            return sp.Pow(left, right, evaluate=False)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and not node.keywords:
+            name = node.func.id
+            arities = {"sqrt": (1,), "root": (2,), "log": (1, 2), "ln": (1,),
+                       "sin": (1,), "cos": (1,), "tan": (1,), "abs": (1,), "exp": (1,)}
+            if name not in arities or len(node.args) not in arities[name]:
+                raise ExpressionError("Невідома функція або неправильна кількість аргументів.")
+            args = [child(n) for n in node.args]
+            a = args[0]
+            if name == "sqrt":
+                self.nonnegative.append(a)
+                return sp.Pow(a, sp.Rational(1, 2), evaluate=False)
+            if name == "root":
+                n = args[1]
+                if not n.is_Integer or not 2 <= n <= 15:
+                    raise ExpressionError("Порядок кореня: ціле число від 2 до 15.")
+                if n % 2 == 0:
+                    self.nonnegative.append(a)
+                    return sp.Pow(a, 1 / n, evaluate=False)
+                return sp.sign(a) * sp.Abs(a) ** (1 / n)
+            if name in {"log", "ln"}:
+                self.positive.append(a)
+                if len(args) == 2:
+                    b = args[1]
+                    if b.free_symbols or not b.is_number or not (b > 0) or b == 1:
+                        raise ExpressionError("Основа логарифма: додатне число, відмінне від 1.")
+                    return sp.Mul(sp.log(a, evaluate=False), 1 / sp.log(b), evaluate=False)
+                return sp.log(a, evaluate=False)
+            if name == "tan":
+                self.denominators.append(sp.cos(a))
+            fn = {"sin": sp.sin, "cos": sp.cos, "tan": sp.tan, "abs": sp.Abs, "exp": sp.exp}[name]
+            return fn(a, evaluate=False)
+        raise ExpressionError("Використовуйте лише числа, x, математичні операції та дозволені функції.")
+
+
+@lru_cache(maxsize=256)
+def parse(source: str) -> Expression:
+    """Parse explicit multiplication, ^ or ** powers, and an optional y= prefix."""
+    if not isinstance(source, str) or not source.strip():
+        raise ExpressionError("Введіть функцію, наприклад x^2 − 4.")
+    if len(source) > MAX_LENGTH:
+        raise ExpressionError("Вираз задовгий (максимум 600 символів).")
+    normalized = source.strip().replace("−", "-").replace("π", "pi").replace("^", "**")
+    if re.match(r"^y\s*=", normalized):
+        normalized = normalized.split("=", 1)[1].strip()
+    try:
+        tree = ast.parse(normalized, mode="eval")
+        if sum(1 for _ in ast.walk(tree)) > MAX_NODES:
+            raise ExpressionError("Забагато операцій. Спростіть вираз.")
+        parser = _Parser()
+        symbolic = parser.visit(tree.body)
+        if len(parser.parameters) > 6:
+            raise ExpressionError("Максимум шість параметрів у функції.")
+        return Expression(source, symbolic, tuple(sorted(parser.parameters)), tuple(parser.denominators),
+                          tuple(parser.nonnegative), tuple(parser.positive))
+    except ExpressionError:
+        raise
+    except (SyntaxError, ValueError, TypeError, OverflowError, RecursionError, ZeroDivisionError):
+        raise ExpressionError("Перевірте дужки, числа та знаки операцій. Множення записуйте як *.") from None
+
+
+@lru_cache(maxsize=256)
+def _compiled(source: str):
+    expression = parse(source)
+    symbols = [X] + [sp.Symbol(n, real=True) for n in expression.parameters]
+    # The expression has already been constructed solely through the allowlisted AST.
+    fn = sp.lambdify(symbols, expression.symbolic, modules="numpy", cse=False)
+    guards = [(kind, sp.lambdify(symbols, item, modules="numpy"))
+              for kind, items in [("denominator", expression.denominators),
+                                  ("nonnegative", expression.nonnegative), ("positive", expression.positive)]
+              for item in items]
+    return expression, fn, guards
+
+
+def evaluate(source: str, x, parameters: dict[str, float] | None = None) -> np.ndarray:
+    """Evaluate real values; undefined points are NaN, including removable holes."""
+    expression, fn, guards = _compiled(source)
+    xx = np.asarray(x, dtype=float)
+    values = parameters or {}
+    args = [xx] + [float(values.get(n, 1.0)) for n in expression.parameters]
+    with np.errstate(all="ignore"):
+        result = np.asarray(fn(*args))
+        if np.iscomplexobj(result):
+            result = np.where(np.abs(result.imag) < 1e-12, result.real, np.nan)
+        result = np.array(np.broadcast_to(result, xx.shape), dtype=float, copy=True)
+        valid = np.isfinite(result)
+        for kind, guard in guards:
+            v = np.asarray(guard(*args))
+            valid &= np.isfinite(v)
+            valid &= (v != 0) if kind == "denominator" else ((v >= 0) if kind == "nonnegative" else (v > 0))
+        return np.where(valid, result, np.nan)
+
+
+def denominator_values(source: str, x, parameters: dict[str, float] | None = None):
+    expression, _, guards = _compiled(source)
+    xx = np.asarray(x, dtype=float)
+    args = [xx] + [float((parameters or {}).get(n, 1)) for n in expression.parameters]
+    with np.errstate(all="ignore"):
+        return [np.broadcast_to(np.asarray(fn(*args), dtype=float), xx.shape)
+                for kind, fn in guards if kind == "denominator"]
