@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QSettings, QSize, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QDockWidget, QScrollArea, QPushButton, QLabel, QToolBar, QToolButton, QFileDialog,
-    QMessageBox, QLineEdit, QAbstractSpinBox, QMenu, QDialog)
+    QMessageBox, QLineEdit, QAbstractSpinBox, QMenu, QDialog, QStackedWidget, QComboBox)
 from graphmath.core.expressions import parse, ExpressionError
 from graphmath.persistence.projects import Project, Function, Parameter, COLORS, from_dict, save, load
 from graphmath.plotting.export import export_graph
@@ -17,6 +17,8 @@ from graphmath.ui.inspector import Inspector
 from graphmath.ui.dialogs import SettingsDialog, ExportDialog
 from graphmath.ui.theme import apply_theme, PALETTES
 from graphmath.ui.icons import icon, PATHS
+from graphmath.core.laboratories import LABS, default_project, identify, markers, number, suggested_view
+from graphmath.ui.learning import LearningPanel
 
 
 class MainWindow(QMainWindow):
@@ -24,14 +26,15 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = settings if settings is not None else QSettings("GraphMath", "GraphMath")
         defaults = {"theme": "light", "precision": 5, "scale": "100%", "colors": COLORS,
-                    "default_view": [-8, 8, -5, 7], "grid": True, "axes": True}
+                    "default_view": [-6, 6, -3, 9], "grid": True, "axes": True, "coordinates": False}
         try:
             self.preferences = {**defaults, **json.loads(self.settings.value("preferences", "{}"))}
             if self.preferences["theme"] not in PALETTES:
                 self.preferences["theme"] = "light"
         except (ValueError, TypeError):
             self.preferences = defaults
-        self.project = Project()
+        self.project = default_project()
+        self.mode = "quadratic"
         self.project.view = list(self.preferences["default_view"])
         self.project.grid = self.preferences["grid"]
         self.project.axes = self.preferences["axes"]
@@ -41,13 +44,29 @@ class MainWindow(QMainWindow):
         self.history = [self.serialized()]
         self.history_index = 0
         self.loading = False
+        self.dirty = False
         self.rows = {}
         self.actions = {}
-        self.setWindowTitle("GraphMath 1.0")
+        self.setWindowTitle("MathLab 1.0")
         self.resize(1400, 850)
         self.setMinimumSize(780, 540)
         self.canvas = Canvas()
-        self.setCentralWidget(self.canvas)
+        graph_area = QWidget()
+        graph_layout = QVBoxLayout(graph_area)
+        graph_layout.setContentsMargins(0, 0, 0, 0)
+        graph_header = QHBoxLayout()
+        self.graph_hint = QLabel('  x → праворуч    ·    y ↑ вгору')
+        self.graph_hint.setObjectName('muted')
+        graph_header.addWidget(self.graph_hint)
+        graph_header.addStretch()
+        for label, tooltip, callback in [('+', 'Збільшити', lambda:self.canvas.viewbox.scaleBy((.8,.8))),
+                                          ('−', 'Зменшити', lambda:self.canvas.viewbox.scaleBy((1.25,1.25))),
+                                          ('Початковий вигляд', 'Повернути зручний масштаб для цієї функції', self.reset_view)]:
+            button=QPushButton(label);button.setToolTip(tooltip);button.clicked.connect(callback)
+            graph_header.addWidget(button)
+        graph_layout.addLayout(graph_header)
+        graph_layout.addWidget(self.canvas, 1)
+        self.setCentralWidget(graph_area)
         self.create_editor()
         self.inspector = Inspector()
         self.inspector_dock = QDockWidget("Дослідження функції", self)
@@ -75,7 +94,18 @@ class MainWindow(QMainWindow):
         self.rebuild_editor()
         self.canvas.set_view(self.project.view)
         self.refresh_canvas()
-        self.resizeDocks([self.editor_dock], [290], Qt.Horizontal)
+        self.resizeDocks([self.editor_dock], [310], Qt.Horizontal)
+        self.canvas.set_coordinates(self.preferences['coordinates'])
+        self.cursor_label.setVisible(self.preferences['coordinates'])
+        self.canvas.curves_updated.connect(self.draw_lab_markers)
+        self.history_timer = QTimer(self)
+        self.history_timer.setSingleShot(True)
+        self.history_timer.setInterval(180)
+        self.history_timer.timeout.connect(self.record)
+        self.sync_learning()
+        self.dirty = False
+        self.saved_state = self.serialized()
+        self.history = [self.saved_state]
         self.update_title()
 
     def serialized(self):
@@ -132,7 +162,36 @@ class MainWindow(QMainWindow):
         self.parameter_scroll.setWidget(self.parameter_container)
         self.parameter_scroll.hide()
         layout.addWidget(self.parameter_scroll)
-        self.editor_dock.setWidget(container)
+        self.custom_page = container
+        sidebar = QWidget()
+        outer = QVBoxLayout(sidebar)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(5)
+        brand = QLabel('MathLab')
+        brand.setStyleSheet('font-size: 23px; font-weight: 600; padding: 15px 16px 0 16px;')
+        outer.addWidget(brand)
+        hint=QLabel('Змінюйте коефіцієнти. Спостерігайте за графіком.')
+        hint.setObjectName('muted');hint.setWordWrap(True);hint.setContentsMargins(16,0,16,5)
+        outer.addWidget(hint)
+        self.mode_selector=QComboBox()
+        self.mode_selector.setAccessibleName('Тип функції')
+        for key,lab in LABS.items():self.mode_selector.addItem(lab.title,key)
+        self.mode_selector.addItem('Власна функція','custom')
+        selector_layout=QHBoxLayout();selector_layout.setContentsMargins(16,0,16,0)
+        selector_layout.addWidget(self.mode_selector);outer.addLayout(selector_layout)
+        self.learning=LearningPanel()
+        self.learning.coefficient_changed.connect(self.lab_coefficient_changed)
+        self.learning.finished.connect(self.flush_history)
+        self.learning.reset_requested.connect(self.reset_coefficients)
+        self.learning.markers_changed.connect(self.draw_lab_markers)
+        self.learning.visibility_requested.connect(lambda:self.visibility(self.project.selected,True))
+        learning_scroll=QScrollArea();learning_scroll.setWidgetResizable(True)
+        learning_scroll.setWidget(self.learning)
+        self.pages=QStackedWidget();self.pages.addWidget(learning_scroll);self.pages.addWidget(container)
+        outer.addWidget(self.pages,1)
+        self.editor_dock.setWidget(sidebar)
+        self.editor_dock.setTitleBarWidget(QWidget())
+        self.mode_selector.currentIndexChanged.connect(self.mode_changed)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.editor_dock)
 
     def create_actions(self):
@@ -144,11 +203,11 @@ class MainWindow(QMainWindow):
             ("undo", "Скасувати", "Ctrl+Z", self.undo), ("redo", "Повторити", "Ctrl+Y", self.redo),
             ("zoom_in", "Збільшити", "", lambda: self.canvas.viewbox.scaleBy((0.8, 0.8))),
             ("zoom_out", "Зменшити", "", lambda: self.canvas.viewbox.scaleBy((1.25, 1.25))),
-            ("reset", "Скинути вигляд", "Ctrl+0", lambda: self.canvas.set_view(self.preferences["default_view"])),
+            ("reset", "Скинути вигляд", "Ctrl+0", self.reset_view),
             ("fit", "Вмістити вибрану функцію", "", self.canvas.fit_selected),
             ("export", "Експорт графіка…", "Ctrl+E", self.export),
             ("theme", "Змінити тему", "", self.toggle_theme),
-            ("settings", "Налаштування…", "", self.show_settings),
+            ("settings", "Налаштування", "", self.show_settings),
             ("analysis", "Дослідження функції", "Ctrl+I", self.toggle_inspector),
             ("panel", "Показати / приховати функції", "Ctrl+B", lambda: self.editor_dock.setVisible(not self.editor_dock.isVisible())),
             ("delete", "Видалити функцію", "Delete", self.delete_selected),
@@ -187,33 +246,144 @@ class MainWindow(QMainWindow):
         view.addAction(self.actions["settings"])
         help_menu = self.menuBar().addMenu("Довідка")
         help_menu.addAction("Синтаксис і керування", self.help)
-        help_menu.addAction("Про GraphMath", lambda: QMessageBox.about(self, "GraphMath 1.0", "GraphMath 1.0.0\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
+        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.0", "MathLab 1.0.0\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
 
     def create_toolbar(self):
-        toolbar = QToolBar("Інструменти", self)
+        toolbar=QToolBar('Основні дії',self)
         toolbar.setMovable(False)
-        toolbar.setIconSize(QSize(20, 20))
+        toolbar.setIconSize(QSize(19,19))
+        toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.addToolBar(toolbar)
-        brand = QLabel("  GraphMath  ")
-        brand.setStyleSheet("font-size: 15px; font-weight: 600;")
-        toolbar.addWidget(brand)
-        toolbar.addSeparator()
-        for key in ["new", "open", "save", "|", "undo", "redo", "|", "zoom_in", "zoom_out", "reset", "fit", "|", "export", "panel", "analysis"]:
-            if key == "|":
-                toolbar.addSeparator()
-            else:
-                toolbar.addAction(self.actions[key])
-        spacer = QWidget()
+        for key in ['new','open','save','export']:
+            toolbar.addAction(self.actions[key])
+        spacer=QWidget()
         from PySide6.QtWidgets import QSizePolicy
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        spacer.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Preferred)
         toolbar.addWidget(spacer)
-        toolbar.addAction(self.actions["theme"])
-        toolbar.addAction(self.actions["settings"])
+        toolbar.addAction(self.actions['settings'])
+        self.main_toolbar=toolbar
+
+    def reset_view(self):
+        function=self.current_function()
+        view=suggested_view(self.mode,{n:p.value for n,p in function.parameters.items()}) if self.mode in LABS and function else self.preferences['default_view']
+        self.canvas.set_view(view)
+
+    def mode_changed(self, *_):
+        key=self.mode_selector.currentData()
+        self.flush_inputs()
+        self.flush_history()
+        if key in LABS:
+            function=next((f for f in self.project.functions if identify(f)==key),None)
+            if function is None:
+                if len(self.project.functions)>=100:
+                    self.statusBar().showMessage('Проєкт уже містить 100 функцій. Видаліть зайву у власному режимі.',5000)
+                    self.sync_learning();return
+                function=LABS[key].make_function()
+                function.color=self.preferences['colors'][list(LABS).index(key)%len(self.preferences['colors'])]
+                self.project.functions.append(function)
+            self.project.selected=function.id
+            self.mode=key
+            self.project.mode=key
+            self.rebuild_editor()
+            self.reset_view()
+        else:
+            self.mode='custom'
+            self.project.mode='custom'
+        self.sync_learning(preserve_custom=True)
+        self.invalidate_analysis()
+        self.refresh_canvas()
+        self.record()
+
+    def sync_learning(self, preserve_custom=False):
+        if not preserve_custom or self.mode!='custom':
+            self.mode=self.project.mode if self.project.mode==identify(self.current_function()) else 'custom'
+        self.mode_selector.blockSignals(True)
+        self.mode_selector.setCurrentIndex(self.mode_selector.findData(self.mode))
+        self.mode_selector.blockSignals(False)
+        self.project.mode=self.mode
+        self.pages.setCurrentIndex(0 if self.mode in LABS else 1)
+        if self.mode in LABS:
+            function=self.current_function()
+            values={c.name:function.parameters[c.name].value for c in LABS[self.mode].controls}
+            self.learning.set_function(self.mode,values,PALETTES[self.preferences['theme']]['text'],self.preferences['precision'],function.visible)
+        self.draw_lab_markers()
+
+    def lab_coefficient_changed(self,name,value):
+        function=self.current_function()
+        if self.mode not in LABS or function is None:return
+        control=next(c for c in LABS[self.mode].controls if c.name==name)
+        value=control.clamp(value)
+        function.parameters[name].value=value
+        self.learning.update_values({c.name:function.parameters[c.name].value for c in LABS[self.mode].controls})
+        self.dirty=True
+        self.update_title()
+        self.history_timer.start()
+        self.invalidate_analysis()
+        self.canvas.begin_interaction(only=function.id)
+        self.canvas.schedule_refresh(only=function.id)
+
+    def flush_history(self):
+        if hasattr(self,'history_timer') and self.history_timer.isActive():
+            self.history_timer.stop()
+            self.record()
+
+    def reset_coefficients(self):
+        if self.mode in LABS:
+            for c in LABS[self.mode].controls:self.lab_coefficient_changed(c.name,c.default)
+            self.sync_learning()
+            self.flush_history()
+
+    def draw_lab_markers(self):
+        if not hasattr(self,'learning'):return
+        from PySide6.QtGui import QColor
+        import pyqtgraph as pg
+        if not hasattr(self,'lab_dots'):
+            self.lab_dots=pg.ScatterPlotItem(size=8,pen=pg.mkPen('#FFFFFF',width=1))
+            self.lab_axis=pg.InfiniteLine(angle=90,pen=pg.mkPen('#A87C42',width=1,style=Qt.DashLine))
+            self.lab_domain=pg.LinearRegionItem(orientation='vertical',movable=False,brush=QColor(112,119,129,25),pen=pg.mkPen(None))
+            self.lab_boundary=pg.InfiniteLine(angle=90,pen=pg.mkPen('#A87C42',width=1,style=Qt.DashLine))
+            for item in [self.lab_dots,self.lab_axis,self.lab_domain,self.lab_boundary]:self.canvas.addItem(item,ignoreBounds=True)
+            self.lab_domain.setZValue(-15)
+            self.lab_labels=[pg.TextItem(anchor=(0,1)) for _ in range(4)]
+            for label in self.lab_labels:self.canvas.addItem(label,ignoreBounds=True)
+        for item in [self.lab_dots,self.lab_axis,self.lab_domain,self.lab_boundary,*self.lab_labels]:item.hide()
+        function=self.current_function()
+        if self.mode not in LABS or not function or not function.visible:
+            self.graph_hint.setText('  x → праворуч    ·    y ↑ вгору')
+            return
+        values={n:p.value for n,p in function.parameters.items()}
+        if self.mode=='logarithmic':
+            h=values['h'];xmin,xmax=self.canvas.current_view()[:2]
+            self.lab_domain.setRegion((xmin,max(xmin,min(h,xmax))))
+            self.lab_domain.setVisible(h>xmin)
+            self.lab_boundary.setPos(h);self.lab_boundary.show()
+            self.graph_hint.setText(f"  Область визначення: x > {number(values['h'],self.preferences['precision'])} · сіра область не належить графіку")
+        else:self.graph_hint.setText('  x → праворуч    ·    y ↑ вгору')
+        if self.mode=='quadratic':
+            data=markers(values,self.preferences['precision']);points=[]
+            for key in ['vertex','zeros','intercept']:
+                if self.learning.toggles[key].isChecked():points.extend(data[key])
+            if self.learning.toggles['symmetry'].isChecked() and data['symmetry'] is not None:
+                self.lab_axis.setPos(data['symmetry']);self.lab_axis.show()
+            unique=[];seen=set()
+            for point in points:
+                coordinate=(point['x'],point['y'])
+                if coordinate not in seen:
+                    seen.add(coordinate);unique.append(point)
+            points=unique
+            self.lab_dots.setData([p['x'] for p in points],[p['y'] for p in points],brush=self.canvas.display_color(function.color))
+            self.lab_dots.show()
+            for label,point in zip(self.lab_labels,points):
+                label.setText(point['exact'],color=PALETTES[self.preferences['theme']]['text'])
+                label.setPos(point['x'],point['y']);label.show()
+        if self.mode=='custom':self.graph_hint.setText('  x → праворуч    ·    y ↑ вгору')
 
     def current_function(self):
         return next((f for f in self.project.functions if f.id == self.project.selected), None)
 
     def flush_inputs(self):
+        self.project.view = self.canvas.current_view()
+        self.flush_history()
         for row in list(self.rows.values()):
             row.flush()
 
@@ -236,6 +406,7 @@ class MainWindow(QMainWindow):
             self.list_layout.insertWidget(self.list_layout.count() - 1, row)
         self.rebuild_parameters()
         self.update_other_functions()
+        self.sync_learning(preserve_custom=True)
 
     def rebuild_parameters(self):
         while self.parameter_layout.count():
@@ -263,6 +434,8 @@ class MainWindow(QMainWindow):
             # Edit a copy so history snapshots retain the previous parameter value.
             control = ParameterControl(name, copy.deepcopy(function.parameters[name]))
             control.changed.connect(self.parameter_changed)
+            control.slider.sliderReleased.connect(self.flush_history)
+            control.value.editingFinished.connect(self.flush_history)
             self.parameter_layout.addWidget(control)
 
     def update_other_functions(self):
@@ -285,16 +458,19 @@ class MainWindow(QMainWindow):
             row.set_selected(key == identifier)
         self.rebuild_parameters()
         self.update_other_functions()
+        self.sync_learning(preserve_custom=True)
         self.invalidate_analysis()
         self.refresh_canvas()
 
     def refresh_canvas(self):
-        self.canvas.update_functions(self.project.functions, self.project.selected)
+        displayed=self.project.functions if self.mode=='custom' else [self.current_function()] if self.current_function() else []
+        self.canvas.update_functions(displayed, self.project.selected)
         self.canvas.set_grid_axes(self.project.grid, self.project.axes)
         self.grid_action.setChecked(self.project.grid)
         self.axes_action.setChecked(self.project.axes)
         function = self.current_function()
-        self.active_label.setText(f"  f(x) = {function.expression[:45]}  " if function else "")
+        self.active_label.setText('  Власна функція  ' if self.mode=='custom' else '  '+LABS[self.mode].title+'  ')
+        self.draw_lab_markers()
 
     def edit_function(self, identifier, source):
         function = next(f for f in self.project.functions if f.id == identifier)
@@ -311,9 +487,12 @@ class MainWindow(QMainWindow):
         function = self.current_function()
         if function:
             function.parameters[name] = copy.deepcopy(parameter)
-            self.record()
+            self.dirty=True
+            self.update_title()
+            self.history_timer.start()
             self.invalidate_analysis()
-            self.canvas.refresh(only=function.id)
+            self.canvas.begin_interaction(only=function.id)
+            self.canvas.schedule_refresh(only=function.id)
 
     def add_function(self):
         self.flush_inputs()
@@ -364,6 +543,7 @@ class MainWindow(QMainWindow):
         self.record()
         self.refresh_canvas()
         self.update_other_functions()
+        self.sync_learning(preserve_custom=True)
         self.invalidate_analysis()
 
     def recolor(self, identifier, color):
@@ -371,6 +551,7 @@ class MainWindow(QMainWindow):
         self.after_structure_change()
 
     def after_structure_change(self):
+        self.mode='custom'
         self.rebuild_editor()
         self.record()
         self.invalidate_analysis()
@@ -395,6 +576,7 @@ class MainWindow(QMainWindow):
             self.history.append(state)
             self.history = self.history[-100:]
             self.history_index = len(self.history) - 1
+        self.dirty = state != self.saved_state
         self.update_title()
 
     def undo(self):
@@ -416,24 +598,28 @@ class MainWindow(QMainWindow):
             if self.project.selected in self.rows:
                 self.rows[self.project.selected].timer.start()
             return
+        self.flush_inputs()
         if self.history_index < len(self.history) - 1:
             self.history_index += 1
             self.restore_history()
 
     def restore_history(self):
         self.project = from_dict(json.loads(self.history[self.history_index]))
+        self.mode=self.project.mode if self.project.mode==identify(self.current_function()) else 'custom'
         self.loading = True
         self.rebuild_editor()
         self.canvas.set_view(self.project.view)
         self.loading = False
         self.invalidate_analysis()
         self.refresh_canvas()
+        self.dirty = self.serialized() != self.saved_state
         self.update_title()
 
     def update_title(self):
-        dirty = self.serialized() != self.saved_state
+        dirty = self.dirty
         filename = Path(self.path).name if self.path else "Без назви"
-        self.setWindowTitle(f"{'● ' if dirty else ''}{filename} — GraphMath 1.0")
+        title=f"{'● ' if dirty else ''}{filename} — MathLab 1.0"
+        if title!=self.windowTitle():self.setWindowTitle(title)
         self.actions["undo"].setEnabled(True)
         self.actions["redo"].setEnabled(True)
 
@@ -450,17 +636,20 @@ class MainWindow(QMainWindow):
     def new_project(self):
         if not self.confirm_discard():
             return
-        self.project = Project(functions=[], view=list(self.preferences["default_view"]),
-                               grid=self.preferences["grid"], axes=self.preferences["axes"])
+        self.project = default_project()
+        self.project.grid,self.project.axes=self.preferences['grid'],self.preferences['axes']
+        self.mode='quadratic'
         self.path = None
         self.reset_document()
 
     def reset_document(self):
+        self.mode=self.project.mode if self.project.mode==identify(self.current_function()) else 'custom'
         self.loading = True
         self.rebuild_editor()
         self.canvas.set_view(self.project.view)
         self.loading = False
         self.saved_state = self.serialized()
+        self.dirty = False
         self.history = [self.saved_state]
         self.history_index = 0
         self.invalidate_analysis()
@@ -471,13 +660,13 @@ class MainWindow(QMainWindow):
         if not self.confirm_discard():
             return False
         if not path:
-            path, _ = QFileDialog.getOpenFileName(self, "Відкрити проєкт", "", "GraphMath (*.graphmath)")
+            path, _ = QFileDialog.getOpenFileName(self, "Відкрити проєкт", "", "Математичні проєкти (*.graphmath)", options=QFileDialog.DontUseNativeDialog)
         if not path:
             return False
         try:
             project = load(path)
         except (OSError, ValueError) as exc:
-            QMessageBox.warning(self, "Не вдалося відкрити проєкт", str(exc))
+            QMessageBox.warning(self, "Не вдалося відкрити проєкт", str(exc) if isinstance(exc,ValueError) else 'Не вдалося прочитати файл. Перевірте шлях і доступ до папки.')
             return False
         self.project, self.path = project, str(path)
         if not self.project.selected and self.project.functions:
@@ -490,7 +679,7 @@ class MainWindow(QMainWindow):
         self.flush_inputs()
         path = self.path
         if save_as or not path:
-            path, _ = QFileDialog.getSaveFileName(self, "Зберегти проєкт", path or "Дослідження.graphmath", "GraphMath (*.graphmath)")
+            path, _ = QFileDialog.getSaveFileName(self, "Зберегти проєкт", path or "Дослідження.graphmath", "Математичні проєкти (*.graphmath)", options=QFileDialog.DontUseNativeDialog)
             if not path:
                 return False
             if not path.endswith(".graphmath"):
@@ -498,10 +687,11 @@ class MainWindow(QMainWindow):
         try:
             save(self.project, path)
         except (ValueError, OSError) as exc:
-            QMessageBox.warning(self, "Не вдалося зберегти проєкт", str(exc))
+            QMessageBox.warning(self, "Не вдалося зберегти проєкт", str(exc) if isinstance(exc,ValueError) else 'Не вдалося записати файл. Перевірте доступ до папки та вільне місце.')
             return False
         self.path = path
         self.saved_state = self.serialized()
+        self.dirty = False
         self.update_title()
         self.remember(path)
         self.statusBar().showMessage("Проєкт збережено", 2500)
@@ -531,7 +721,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() != QDialog.Accepted:
             return
         ext = dialog.format.currentText().lower()
-        path, _ = QFileDialog.getSaveFileName(self, "Експорт графіка", f"Графік.{ext}", f"{ext.upper()} (*.{ext})")
+        path, _ = QFileDialog.getSaveFileName(self, "Експорт графіка", f"Графік.{ext}", f"{ext.upper()} (*.{ext})", options=QFileDialog.DontUseNativeDialog)
         if not path:
             return
         if not path.lower().endswith(f".{ext}"):
@@ -543,19 +733,17 @@ class MainWindow(QMainWindow):
             self.canvas.hover_dot.hide()
             export_graph(self.canvas, path, transparent=dialog.transparent.isChecked(), width=dialog.width.value())
             self.statusBar().showMessage(f"Графік експортовано: {Path(path).name}", 5000)
-        except Exception as exc:
-            QMessageBox.warning(self, "Помилка експорту", str(exc))
+        except Exception:
+            QMessageBox.warning(self, "Помилка експорту", 'Не вдалося експортувати графік. Спробуйте іншу папку або формат.')
         finally:
-            self.canvas.cross_x.show()
-            self.canvas.cross_y.show()
-            self.canvas.hover_dot.show()
+            self.canvas.set_coordinates(self.preferences['coordinates'])
 
     def set_theme(self, name):
         self.preferences["theme"] = name
         apply_theme(QApplication.instance(), name)
         scale = int(self.preferences["scale"].rstrip("%")) / 100
         if scale != 1:
-            stylesheet = QApplication.instance().styleSheet().replace("font-size: 12px", f"font-size: {round(12 * scale)}px")
+            stylesheet = QApplication.instance().styleSheet().replace("font-size: 13px", f"font-size: {round(13 * scale)}px")
             QApplication.instance().setStyleSheet(stylesheet)
         self.canvas.set_theme(name)
         c = PALETTES[name]
@@ -567,8 +755,10 @@ class MainWindow(QMainWindow):
                 row.text_color = c["text"]
                 row.render()
         self.canvas.set_grid_axes(self.project.grid, self.project.axes)
-        self.canvas.update_functions(self.project.functions, self.project.selected)
+        displayed=self.project.functions if self.mode=='custom' else [self.current_function()] if self.current_function() else []
+        self.canvas.update_functions(displayed, self.project.selected)
         self.draw_annotations()
+        self.sync_learning(preserve_custom=True)
 
     def toggle_theme(self):
         self.set_theme("dark" if self.preferences["theme"] == "light" else "light")
@@ -583,7 +773,8 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted:
             self.preferences = dialog.values
             self.project.grid, self.project.axes = self.preferences["grid"], self.preferences["axes"]
-            self.canvas.set_view(self.preferences["default_view"])
+            self.canvas.set_coordinates(self.preferences['coordinates'])
+            self.cursor_label.setVisible(self.preferences['coordinates'])
             self.set_theme(self.preferences["theme"])
             self.record()
             self.save_preferences()
@@ -600,11 +791,13 @@ class MainWindow(QMainWindow):
 
     def view_changed(self, view):
         self.scale_label.setText(f"  x: {view[0]:.3g} … {view[1]:.3g}  ")
-        if not self.loading:
+        if not self.loading and not np.allclose(self.project.view, view, rtol=1e-10, atol=1e-10):
             self.project.view = view
+            self.dirty = True
             self.update_title()
         if self.inspector.toggles["tangent"].isChecked():
             self.draw_annotations()
+        self.draw_lab_markers()
 
     def cursor_moved(self, x, y):
         precision = self.preferences["precision"]
@@ -658,7 +851,7 @@ class MainWindow(QMainWindow):
                     pass
 
     def help(self):
-        QMessageBox.information(self, "Синтаксис і керування", "Введення: x^2, 2^x, sqrt(x), root(x,3), log(x,2), ln(x),\nsin(x), cos(x), tan(x), abs(x), exp(x), pi, e.\nМноження: 2*x (не 2x). Тригонометрія у радіанах.\nПараметри: a*x^2+b*x+c; для кожної функції окремо.\n\nКолесо миші — масштаб; перетягування — панорама.\nКлацніть криву або рядок, щоб вибрати функцію.\nCtrl+B — панель функцій, Ctrl+I — дослідження.\n\nСимвольний аналіз має обмеження 8 секунд.\nНевизначені результати позначаються явно.\nСкінченна вибірка може пропустити надто вузькі особливості;\nзбільшіть потрібну область для перевірки.")
+        QMessageBox.information(self, "Синтаксис і керування", "Введення: x^2, 2^x, sqrt(x), root(x,3), log(x,2), ln(x),\nsin(x), cos(x), tan(x), abs(x), exp(x), pi, e.\nМноження: 2x або 2*x; також підтримано x². Тригонометрія у радіанах.\nПараметри: a*x^2+b*x+c; для кожної функції окремо.\n\nКолесо миші — масштаб; перетягування — панорама.\nКлацніть криву або рядок, щоб вибрати функцію.\nCtrl+B — панель функцій, Ctrl+I — дослідження.\n\nСимвольний аналіз має обмеження 8 секунд.\nНевизначені результати позначаються явно.\nСкінченна вибірка може пропустити надто вузькі особливості;\nзбільшіть потрібну область для перевірки.")
 
     def closeEvent(self, event):
         if self.confirm_discard():

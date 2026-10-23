@@ -37,6 +37,7 @@ class Project:
     grid: bool = True
     axes: bool = True
     selected: str | None = None
+    mode: str = "custom"
 
     def to_dict(self):
         return {"format": "GraphMath", "version": 1, **asdict(self)}
@@ -84,9 +85,12 @@ def from_dict(data: dict) -> Project:
         selected = data.get("selected")
         if selected is not None and selected not in ids:
             raise ValueError("Вибрана функція відсутня у проєкті.")
-        return Project(functions, view, data.get("grid", True), data.get("axes", True), selected)
+        mode=data.get('mode','custom')
+        if mode not in ('custom','quadratic','exponential','logarithmic'):
+            raise ValueError('Невідомий режим математичного проєкту.')
+        return Project(functions, view, data.get("grid", True), data.get("axes", True), selected, mode)
     except (KeyError, TypeError, AttributeError) as exc:
-        raise ValueError("Пошкоджений файл проєкту GraphMath.") from exc
+        raise ValueError("Пошкоджений файл математичного проєкту.") from exc
 
 
 def save(project: Project, path: str | Path):
@@ -113,7 +117,7 @@ def load(path: str | Path) -> Project:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
-            raise ValueError("Очікується об’єкт GraphMath.")
+            raise ValueError("Файл має містити дані математичного проєкту.")
         return from_dict(data)
     except (json.JSONDecodeError, UnicodeError, RecursionError) as exc:
         raise ValueError("Не вдалося прочитати JSON проєкту.") from exc

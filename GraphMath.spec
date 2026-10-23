@@ -1,8 +1,11 @@
 # Build on the target OS: PyInstaller cannot cross-compile Linux -> Windows.
 from pathlib import Path
+import os
 from PyInstaller.utils.hooks import collect_data_files
 
 root = Path(SPECPATH)
+product = os.environ.get('GRAPHMATH_PRODUCT', 'MathLab')
+assert product in ('MathLab','GraphMath')
 datas = collect_data_files('matplotlib') + collect_data_files('graphmath')
 datas += [(str(root / 'LICENSE'), '.'), (str(root / 'THIRD_PARTY_NOTICES.md'), '.'),
           (str(root / 'docs'), 'docs'), (str(root / 'build' / 'licenses'), 'licenses')]
@@ -14,7 +17,7 @@ a = Analysis(
     noarchive=False,
 )
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='GraphMath',
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name=product,
           debug=False, bootloader_ignore_signals=False, strip=False, upx=False,
           console=False, disable_windowed_traceback=False, icon=str(root / 'graphmath' / 'resources' / 'icon.ico'))
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name='GraphMath')
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name=product)

@@ -12,7 +12,8 @@ from graphmath.plotting.sampling import sample
     ('1/x', [-2,1,2], [-.5,1,.5]), ('sin(x)', [0,np.pi/2], [0,1]),
     ('cos(x)', [0,np.pi], [1,-1]), ('tan(x)', [0,np.pi/4], [0,1]),
     ('abs(x)', [-2,0,2], [2,0,2]), ('exp(x)', [0,1], [1,np.e]),
-    ('pi*x', [0,1], [0,np.pi]), ('−x^2', [2], [-4]),
+    ('2x+1', [0,1,2], [1,3,5]), ('x² − 4', [-2,0,2], [0,-4,0]),
+    ('2(x+1)', [0,1], [2,4]), ('pi*x', [0,1], [0,np.pi]), ('−x^2', [2], [-4]),
 ])
 def test_function_families(source, x, expected):
     np.testing.assert_allclose(evaluate(source, x), expected, atol=1e-10)
@@ -20,7 +21,7 @@ def test_function_families(source, x, expected):
 
 @pytest.mark.parametrize('source', [
     '__import__("os")', 'x.__class__', '[x]', '(lambda:1)()', 'open("file")',
-    'sin(x, x)', 'unknown(x)', 'x[0]', 'True', '1e999', '2x', 'x;',
+    'sin(x, x)', 'unknown(x)', 'x[0]', 'True', '1e999', 'xy', 'x;',
     'x if x else 0', '{1:2}', 'log(x,1)', 'log(x,-2)', 'root(x,0)',
     '1/0', 'x^1000', 'x^(x+1)', 'sin(x, a=1)', 'x//2', '',
 ])

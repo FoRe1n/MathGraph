@@ -7,12 +7,17 @@ from graphmath.ui.window import MainWindow
 from graphmath.ui.dialogs import ExportDialog, SettingsDialog
 from graphmath.ui.formula import formula_png
 from graphmath.plotting.export import export_graph
-from graphmath.persistence.projects import Parameter, save
+from graphmath.persistence.projects import Parameter, Project, save
 
 
 @pytest.fixture
 def window(qtbot,tmp_path):
     w=MainWindow(QSettings(str(tmp_path/'settings.ini'),QSettings.IniFormat))
+    # Preserve the original GraphMath two-function regression workspace explicitly;
+    # MathLab's new default educational screen is covered in test_mathlab_gui.py.
+    w.project=Project()
+    w.project.selected=w.project.functions[0].id
+    w.reset_document()
     qtbot.addWidget(w, before_close_func=lambda widget: setattr(widget, "confirm_discard", lambda: True))
     w.show()
     qtbot.wait(80)

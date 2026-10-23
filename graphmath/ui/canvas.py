@@ -2,38 +2,50 @@ from __future__ import annotations
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Signal, QTimer, Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor
 from graphmath.core.expressions import evaluate
 from graphmath.plotting.sampling import sample
 from graphmath.ui.theme import PALETTES
+from graphmath.ui.grid import CoordinateGrid
 
-pg.setConfigOptions(antialias=True, useOpenGL=False)
+pg.setConfigOptions(antialias=False, useOpenGL=False)
 
 
 class Canvas(pg.PlotWidget):
     selected = Signal(str)
     cursor = Signal(float, float)
     view_changed = Signal(list)
+    curves_updated = Signal()
 
     def __init__(self):
         super().__init__()
         self.setMinimumWidth(280)
         self.plotItem.setMenuEnabled(False)
         self.plotItem.hideButtons()
-        self.plotItem.setLabel("bottom", "x")
-        self.plotItem.setLabel("left", "y")
+        self.plotItem.setLabel("bottom", "x — аргумент")
+        self.plotItem.setLabel("left", "y — значення функції")
         self.plotItem.setDownsampling(auto=True, mode="peak")
         self.plotItem.setClipToView(True)
         self.viewbox = self.plotItem.getViewBox()
         self.viewbox.setMouseMode(pg.ViewBox.PanMode)
         self.viewbox.setLimits(minXRange=1e-6, minYRange=1e-6, maxXRange=2e8, maxYRange=2e8)
+        self.grid_item = CoordinateGrid()
+        self.addItem(self.grid_item, ignoreBounds=True)
+        self.sample_cache = {}
+        self.sample_count = 0
+        self.pending_functions = set()
+        self.coordinates_enabled = False
+        self.interacting = False
+        self.refine_ids = set()
         self.functions = []
         self.curves = {}
         self.annotations = []
         self.selected_id = None
         self.cross_x = pg.InfiniteLine(angle=90, movable=False)
         self.cross_y = pg.InfiniteLine(angle=0, movable=False)
+        self.cross_x.hide()
         self.cross_x.setZValue(-1)
+        self.cross_y.hide()
         self.cross_y.setZValue(-1)
         self.addItem(self.cross_x, ignoreBounds=True)
         self.addItem(self.cross_y, ignoreBounds=True)
@@ -41,15 +53,27 @@ class Canvas(pg.PlotWidget):
         self.addItem(self.hover_dot)
         self.resample_timer = QTimer(self)
         self.resample_timer.setSingleShot(True)
-        self.resample_timer.setInterval(45)
-        self.resample_timer.timeout.connect(self.refresh)
+        self.resample_timer.setInterval(16)
+        self.resample_timer.timeout.connect(self.flush_refresh)
+        self.refine_timer = QTimer(self)
+        self.refine_timer.setSingleShot(True)
+        self.refine_timer.setInterval(140)
+        self.refine_timer.timeout.connect(self.finish_interaction)
+        self.notify_timer = QTimer(self)
+        self.notify_timer.setSingleShot(True)
+        self.notify_timer.setInterval(80)
+        self.notify_timer.timeout.connect(lambda: self.view_changed.emit(self.current_view()))
         self.viewbox.sigRangeChanged.connect(self.range_changed)
-        self.proxy = pg.SignalProxy(self.scene().sigMouseMoved, rateLimit=40, slot=self.mouse_move)
+        self.proxy = pg.SignalProxy(self.scene().sigMouseMoved, rateLimit=20, slot=self.mouse_move)
         self.set_theme("light")
 
     def range_changed(self, *_):
-        self.resample_timer.start()
-        self.view_changed.emit(self.current_view())
+        view = self.current_view()
+        self.grid_item.set_view(view)
+        self.begin_interaction()
+        self.schedule_refresh()
+        if not self.notify_timer.isActive():
+            self.notify_timer.start()
 
     def current_view(self):
         xr, yr = self.viewbox.viewRange()
@@ -61,6 +85,8 @@ class Canvas(pg.PlotWidget):
     def set_theme(self, name):
         self.theme = name
         c = PALETTES[name]
+        self.grid_item.color = QColor(c["muted"])
+        self.grid_item.update()
         self.setBackground(c["canvas"])
         for axis in ["left", "bottom"]:
             item = self.getAxis(axis)
@@ -79,7 +105,8 @@ class Canvas(pg.PlotWidget):
             self.addItem(line)
 
     def set_grid_axes(self, grid, axes):
-        self.showGrid(x=grid, y=grid, alpha=0.13)
+        self.showGrid(x=False, y=False)
+        self.grid_item.setVisible(grid)
         for line in self.axes_lines:
             line.setVisible(axes)
         self.plotItem.showAxis("left", axes)
@@ -92,15 +119,17 @@ class Canvas(pg.PlotWidget):
         for identifier in list(self.curves):
             if identifier not in ids:
                 self.removeItem(self.curves.pop(identifier))
+                self.sample_cache.pop(identifier, None)
         for f in functions:
             if f.id not in self.curves:
-                curve = pg.PlotDataItem(connect="finite")
+                curve = pg.PlotDataItem(connect="finite", antialias=False)
                 curve.setCurveClickable(True, width=10)
                 curve.sigClicked.connect(lambda *_, identifier=f.id: self.selected.emit(identifier))
                 self.curves[f.id] = curve
                 self.addItem(curve)
-            self.curves[f.id].setPen(pg.mkPen(self.display_color(f.color), width=2.6 if f.id == selected else 1.9))
+            self.curves[f.id].setPen(pg.mkPen(self.display_color(f.color), width=2 if f.id == selected else 1.5))
             self.curves[f.id].setVisible(f.visible)
+            if self.interacting:self.refine_ids.add(f.id)
         self.refresh()
 
     def display_color(self, color):
@@ -109,25 +138,83 @@ class Canvas(pg.PlotWidget):
             return QColor(color).lighter(145)
         return color
 
-    def refresh(self, only=None):
+    def begin_interaction(self, only=None):
+        if not self.interacting:
+            self.interacting=True
+            for curve in self.curves.values():
+                curve.opts['antialias']=False
+                curve.curve.opts['antialias']=False
+                curve.curve.update()
+        self.refine_ids.update([only] if only else [f.id for f in self.functions])
+        self.refine_timer.start()
+
+    def finish_interaction(self):
+        self.interacting=False
+        for curve in self.curves.values():
+            curve.opts['antialias']=True
+            curve.curve.opts['antialias']=True
+            curve.curve.update()
+        identifiers=self.refine_ids.copy()
+        self.refine_ids.clear()
+        self.refresh(force=True,identifiers=identifiers)
+
+    def schedule_refresh(self, only=None):
+        if only:
+            self.pending_functions.add(only)
+        else:
+            self.pending_functions.update(f.id for f in self.functions)
+        if not self.resample_timer.isActive():
+            self.resample_timer.start()
+
+    def flush_refresh(self):
+        pending = self.pending_functions.copy()
+        self.pending_functions.clear()
+        self.refresh(identifiers=pending)
+
+    def refresh(self, only=None, *, force=False, identifiers=None):
         xmin, xmax, ymin, ymax = self.current_view()
+        width, height = xmax-xmin, ymax-ymin
         for f in self.functions:
-            if not f.visible or (only is not None and f.id != only):
+            if not f.visible or (only is not None and f.id != only) or (identifiers is not None and f.id not in identifiers):
                 continue
+            parameters = {n: p.value for n, p in f.parameters.items()}
+            key = (f.expression, tuple(sorted(parameters.items())), self.width())
+            cached = self.sample_cache.get(f.id)
+            if not force and cached and cached['key'] == key:
+                if (cached['left'] <= xmin and cached['right'] >= xmax
+                    and .65 <= width/cached['width'] <= 1.5
+                    and .65 <= height/cached['height'] <= 1.5
+                    and ymin >= cached['ymin']-cached['height']*2
+                    and ymax <= cached['ymax']+cached['height']*2):
+                    continue  # Qt transforms existing data; do not reupload identical paths.
             try:
-                xx, yy = sample(f.expression, xmin, xmax, {n: p.value for n, p in f.parameters.items()}, pixels=self.width(), yrange=(ymin, ymax))
-                self.curves[f.id].setData(xx, yy, connect="finite")
+                left, right = xmin-width*.6, xmax+width*.6
+                xx, yy = sample(f.expression, left, right, parameters,
+                                pixels=int(self.width()*1.1), yrange=(ymin, ymax))
+                self.sample_count += 1
+                self.curves[f.id].setData(xx, yy, connect="finite", antialias=not self.interacting)
+                self.sample_cache[f.id] = dict(key=key, left=left, right=right, width=width,
+                                               height=height, ymin=ymin, ymax=ymax)
             except Exception:
                 self.curves[f.id].setData([], [])
+                self.sample_cache.pop(f.id, None)
+        self.curves_updated.emit()
+
+    def set_coordinates(self, enabled):
+        self.coordinates_enabled = enabled
+        self.hover_dot.setVisible(enabled)
+        self.cross_x.hide()
+        self.cross_y.hide()
+        self.setToolTip('')
 
     def mouse_move(self, event):
+        if not self.coordinates_enabled:
+            return
         position = event[0]
         if not self.sceneBoundingRect().contains(position):
             return
         point = self.viewbox.mapSceneToView(position)
         x, y = point.x(), point.y()
-        self.cross_x.setPos(x)
-        self.cross_y.setPos(y)
         self.cursor.emit(x, y)
         function = next((f for f in self.functions if f.id == self.selected_id and f.visible), None)
         if function:
@@ -135,7 +222,7 @@ class Canvas(pg.PlotWidget):
                 value = float(evaluate(function.expression, np.array(x), {n: p.value for n, p in function.parameters.items()}))
                 if np.isfinite(value):
                     self.hover_dot.setData([x], [value], brush=self.display_color(function.color))
-                    self.setToolTip(f"x = {x:.5g}\nf(x) = {value:.5g}")
+
                     return
             except Exception:
                 pass

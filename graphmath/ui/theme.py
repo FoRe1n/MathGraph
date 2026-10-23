@@ -17,7 +17,7 @@ def apply_theme(app, name: str):
         p.setColor(role, QColor(c[key]))
     app.setPalette(p)
     app.setStyleSheet(f"""
-        QWidget {{ color: {c['text']}; font-family: 'Segoe UI', 'DejaVu Sans', sans-serif; font-size: 12px; }}
+        QWidget {{ color: {c['text']}; font-family: 'Segoe UI', 'DejaVu Sans', sans-serif; font-size: 13px; }}
         QMainWindow, QDialog {{ background: {c['panel']}; }}
         QToolBar {{ background: {c['surface']}; border: 0; border-bottom: 1px solid {c['border']}; spacing: 3px; padding: 5px; }}
         QToolButton, QPushButton {{ border: 1px solid transparent; background: transparent; padding: 6px 8px; border-radius: 3px; }}

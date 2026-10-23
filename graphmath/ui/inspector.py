@@ -92,7 +92,7 @@ class Inspector(QWidget):
             if "result" in message:
                 self.result = message["result"]
                 self.status.setText("Точні символьні результати · координати маркерів наближені")
-                for title, value in self.result["properties"].items():
+                for title, value in self.result.get("display_properties",self.result["properties"]).items():
                     label = QLabel(f"{title}\n{value}")
                     label.setTextFormat(Qt.PlainText)
                     label.setWordWrap(True)

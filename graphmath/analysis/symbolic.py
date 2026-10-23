@@ -126,7 +126,7 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
             roots = _safe(lambda: sp.solveset(expr - second, X, domain=domain.intersect(second_domain)))
             intersections = _finite_points(roots, expr, domain.intersect(second_domain))
             intersection_text = _text(roots)
-    return {
+    result = {
         "properties": {
             "Область визначення": _text(domain), "Область значень": _text(value_range),
             "Нулі / перетини Ox": _text(zeros), "Перетин Oy": _text(intercept),
@@ -141,6 +141,13 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
         "intersections": intersections,
         "derivative_latex": sp.latex(derivative) if derivative is not None else None,
     }
+    display=dict(result['properties'])
+    for label,value in [('Область визначення',domain),('Область значень',value_range),
+                        ('Нулі / перетини Ox',zeros),('Перетин Oy',intercept),
+                        ('Похідна',derivative),('Зростає',increasing),('Спадає',decreasing)]:
+        display[label]=UNKNOWN if value is None else sp.pretty(sp.simplify(value),use_unicode=True,wrap_line=False)
+    result['display_properties']=display
+    return result
 
 
 def worker(connection, source, parameters, other, other_parameters):

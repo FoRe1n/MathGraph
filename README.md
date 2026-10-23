@@ -1,77 +1,84 @@
-# GraphMath 1.0
+# MathLab 1.0
 
-An offline Windows mathematical workspace with a Ukrainian interface. The graph is
-the main work surface: compact function rows, typeset formulas, independent
-coefficient sliders, and an optional analysis inspector. Built as a standalone
-project in the assigned **FoRe1n/MathGraph** repository; no connection to MathTrainer
-or CS2 Optimizer.
+An offline Ukrainian mathematics laboratory for high school students, evolved
+incrementally from GraphMath in the existing **FoRe1n/MathGraph** repository.
+Choose a function, move its coefficients, and see both the curve and an explanation.
 
-![GraphMath light workspace](docs/screenshots/light.png)
+![MathLab quadratic laboratory](docs/screenshots/mathlab/quadratic-light.png)
 
-## Windows download
+## Windows distribution
 
-Download **[GraphMath v1.0.0 for Windows x64 (ZIP)](https://github.com/FoRe1n/MathGraph/releases/download/v1.0.0/GraphMath-v1.0.0-Windows-x64.zip)**
-([release notes and SHA256](https://github.com/FoRe1n/MathGraph/releases/tag/v1.0.0)).
-Extract the **entire folder** and open `GraphMath.exe`. Windows 10/11 x64;
-no Python, account or network connection required. Do not move the EXE away from
-its `_internal` folder. The portable build is unsigned.
+The new release target is **MathLab v1.0.0**, tag `mathlab-v1.0.0`, with portable
+`MathLab-v1.0.0-Windows-x64.zip` and `MathLab.exe`. The native Windows workflow
+must pass tests, resource checks and the frozen application smoke test before it
+publishes. Check [Releases](https://github.com/FoRe1n/MathGraph/releases) for status.
 
-[Native Windows CI](https://github.com/FoRe1n/MathGraph/actions/runs/39971378185)
-passed all 81 tests, source/frozen startup checks and resource verification before
-publication. The public download was independently downloaded and its SHA256 and
-ZIP integrity verified. See [validation details](docs/validation.md).
+The original [GraphMath v1.0.0 release](https://github.com/FoRe1n/MathGraph/releases/tag/v1.0.0)
+and its tag remain available. Internal `graphmath` imports, the expression engine,
+PyQtGraph, NumPy/SymPy, existing analysis and project format are retained.
 
-## Features
+## Learning workspace
 
-- Multiple independently colored, editable, hideable and duplicable functions
-  (up to 100; 10-function workflows covered by tests).
-- Restricted AST parser; explicit multiplication, real-domain evaluation, radicals,
-  powers, logarithms, rational, trigonometric and absolute-value functions.
-- Debounced expression editing and cached NumPy evaluation; domain/pole path breaks.
-- Live MathText previews with packaged mathematical fonts.
-- Per-function coefficient sliders with bounds, step and reset value.
-- Pan/zoom, curve selection, cursor inspection, fit/reset, grid and axis controls.
-- Process-isolated symbolic analysis with an eight-second timeout; roots, derivative,
-  domain/range, monotonicity, extrema and asymptotes where reliably determined.
-- Optional root/extremum/intersection/asymptote markers and approximate tangents.
-- Versioned `.graphmath` JSON projects, atomic saves, recent files, unsaved-change
-  prompts, undo/redo and standard shortcuts.
-- Clean live-scene PNG/SVG/PDF export, transparent PNG, light/dark themes and settings.
+- **Quadratic:** y = ax² + bx + c; correct vertex, symmetry, intercept and degenerate
+  cases, with optional graph markers.
+- **Exponential:** y = a·bˣ + c; positive base excluding 1, growth/decay, reflection
+  and translation explained from the actual coefficient values.
+- **Logarithmic:** y = a·log_b(x − h) + k; safe bases, explicit x > h domain and
+  shaded excluded region, shifts and reflection.
+- **Custom functions:** the existing multiple-function editor, independent
+  parameters, analysis, annotations, undo/redo, colors and visibility remain.
+  Safe school notation includes `x²`, `2x`, `2(x+1)` and explicit `2*x`.
+
+The graph dominates a light workspace. Five toolbar actions, readable formulas,
+short Ukrainian explanations, adjustable sliders and a compact settings dialog
+replace the former editor-first default. Dark mode remains available. No account,
+API key, server or Internet connection is needed for ordinary use.
+
+## Compatibility and performance
+
+Old `.graphmath` files retain formulas, colors, parameters, visibility and ranges.
+Version 1 remains in use; optional `mode` metadata defaults to `custom` for old
+files. Old GraphMath readers ignore this additive field. No project migration is
+required. The original regression cases remain in the test suite, with a dedicated
+legacy workspace fixture and additional learning-mode tests.
+
+Raster profiling identified axis/grid painting as a major cost. MathLab uses a
+bounded grid, cached overscan samples, reused graphics, fast active interaction and
+idle refinement. JSON history and formula previews are coalesced. Cursor inspection
+is optional and no longer creates repeated tooltips or large crosshairs.
+See [measurements and limitations](docs/mathlab-performance.md); no 60 FPS claim is made.
 
 ## Development
 
-Python 3.12 is the reproducible build target (source requires 3.11+).
+Python 3.12 is the reproducible build target; internal package and CLI remain
+`graphmath` for compatibility. Run from the existing checkout:
 
 ```bash
 python -m venv .venv
-# Linux:
+# Linux
 .venv/bin/python -m pip install --require-hashes -r requirements-linux.lock
 .venv/bin/python -m graphmath
-# Windows PowerShell:
+# Windows PowerShell
 .venv\Scripts\python -m pip install --require-hashes -r requirements-windows.lock
 .venv\Scripts\python -m graphmath
 ```
 
-Run tests with the same interpreter: `python -m pytest -q`. Headless validation:
-`python -m graphmath --smoke-test --smoke-output artifacts/smoke`. This starts the
-actual Qt window, round-trips a project, exports all three formats, captures both
-themes, writes `result.json`, and returns a nonzero status on failure.
+Tests: `python -m pytest -q`. Source/frozen smoke mode:
+`python -m graphmath --smoke-test --smoke-output artifacts/smoke`.
+It checks all laboratories, the preserved analysis worker, project I/O and exports.
+Real Qt screenshots: `python scripts/capture_mathlab_qa.py`.
+Reproducible interaction measurements: `python scripts/benchmark_interaction.py`.
+Headless Linux selects `QT_QPA_PLATFORM=offscreen`; an interactive desktop needs a
+display and the usual Qt system libraries. PyInstaller's `GraphMath.spec` filename
+is retained; its default distribution is now `MathLab`.
 
-No service, credential or database is required. Headless Linux may need
-`QT_QPA_PLATFORM=offscreen`; a real desktop needs the usual Qt/X11 system libraries.
-
-## Structure and documentation
-
-- `graphmath/core`: safe parsing and vectorized real numerical evaluation.
-- `graphmath/plotting`: sampling and live graph export.
-- `graphmath/analysis`: exact SymPy analysis, isolated from the GUI.
-- `graphmath/persistence`: validated versioned JSON, atomic writes.
-- `graphmath/ui`: Qt canvas, function editor, parameter controls, inspector, themes.
-- `graphmath/app`: entry point and packaged smoke-test mode.
 - [Ukrainian user guide](docs/user-guide.uk.md)
-- [Engine API and limits](docs/engine.md)
+- [Architecture and engine API](docs/engine.md)
+- [MathLab validation and changed files](docs/mathlab-validation.md)
+- [Performance measurements](docs/mathlab-performance.md)
 - [Windows build and release](docs/windows-build.md)
-- [Validation report](docs/validation.md)
+- [Original GraphMath validation](docs/validation.md)
 
-Original code is MIT licensed. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-for bundled libraries, font licenses, and Qt LGPL replacement rights.
+Original code is MIT licensed. [Third-party notices](THIRD_PARTY_NOTICES.md) cover
+Qt/PySide6 LGPL components, mathematical fonts and other dependencies. Libraries
+remain dynamically replaceable in the portable distribution. Builds are unsigned.

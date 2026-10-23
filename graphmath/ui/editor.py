@@ -89,7 +89,7 @@ class FunctionRow(QFrame):
         self.style().polish(self)
 
     def choose_color(self):
-        color = QColorDialog.getColor(self.function.color, self, "Колір функції")
+        color = QColorDialog.getColor(self.function.color, self, "Колір функції", options=QColorDialog.DontUseNativeDialog)
         if color.isValid():
             self.recolored.emit(self.function.id, color.name())
 

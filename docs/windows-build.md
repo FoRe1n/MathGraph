@@ -1,8 +1,7 @@
-# Portable Windows build and release
+# MathLab portable Windows build
 
-Build on Windows x64, using Python 3.12 and the hash-locked Windows dependencies.
-PyInstaller cannot produce a Windows executable from this Linux cloud machine.
-The workflow `.github/workflows/windows.yml` is the authoritative recipe.
+Build on Windows x64 with Python 3.12 and the existing hash-locked dependency set.
+The internal package and spec filename remain compatible with GraphMath:
 
 ```powershell
 python -m venv .venv
@@ -11,33 +10,25 @@ python -m venv .venv
 .venv\Scripts\python -m graphmath --smoke-test
 .venv\Scripts\python scripts/collect_licenses.py build/licenses
 .venv\Scripts\python -m PyInstaller --noconfirm --clean GraphMath.spec
-.venv\Scripts\python scripts/verify_distribution.py dist/GraphMath
-dist\GraphMath\GraphMath.exe --smoke-test --smoke-output artifacts/frozen-smoke
-Compress-Archive dist/GraphMath GraphMath-v1.0.0-Windows-x64.zip
+.venv\Scripts\python scripts/verify_distribution.py dist/MathLab
+dist\MathLab\MathLab.exe --smoke-test --smoke-output artifacts/frozen-smoke
+Compress-Archive dist/MathLab MathLab-v1.0.0-Windows-x64.zip
 ```
 
-The onedir bundle dynamically loads Qt libraries, includes platform plugins,
-Matplotlib math fonts, Python, NumPy/SymPy, documentation and full dependency
-license notices. Keep the complete folder together. It uses a windowed bootloader
-without a terminal. The multiprocessing entry point is guarded and freeze-aware.
-Smoke mode starts the actual application offscreen, checks the analysis subprocess,
-round-trips a project, exports three formats and writes explicit results. Native
-interactive QA on Windows remains distinct from this automated startup test.
+PyInstaller cannot cross-compile Linux to Windows. The GitHub Actions workflow
+uses Windows 2022 x64, runs all tests, offscreen interaction benchmarks, laboratory
+and analysis startup checks, and captures real application screenshots. It builds
+a windowed onedir bundle, verifies qwindows.dll, mathematical fonts, Ukrainian Qt
+translations and license files, then runs the frozen EXE before making the ZIP.
+Failure prevents release publication.
 
-Pushes and pull requests build a downloadable workflow artifact. Pushing tag
-`v1.0.0` additionally publishes **GraphMath v1.0.0** with the ZIP and SHA256SUMS,
-only after tests and the frozen smoke check succeed. The build job has read-only
-repository access; only the release job receives `contents: write`. Credentials
-are supplied by GitHub, never embedded. Existing releases are not overwritten.
+Pull requests build validation artifacts. After validated changes are merged,
+tag **mathlab-v1.0.0** publishes **MathLab v1.0.0** and
+`MathLab-v1.0.0-Windows-x64.zip` plus SHA256SUMS. The old `v1.0.0` tag and GraphMath
+release are not changed. The build job has read-only repository permission; only
+the release job receives `contents: write`. Existing releases are not overwritten.
 
-Lock refresh (requires uv) is intentional and reviewable:
-
-```bash
-uv pip compile pyproject.toml --extra dev --python-version 3.12 --python-platform windows --generate-hashes --output-file requirements-windows.lock
-uv pip compile pyproject.toml --extra dev --python-version 3.12 --python-platform linux --generate-hashes --output-file requirements-linux.lock
-```
-
-If organization policies block Actions or publishing, an administrator must enable
-the required workflow/token permission. Do not substitute an untested ZIP or label
-a Linux binary as a Windows build. Code signing and a Windows installer are future
-work; the initial release is a portable unsigned ZIP.
+The complete extracted folder is required; users double-click MathLab.exe without
+Python or a terminal. Libraries and LGPL components stay dynamically replaceable.
+Code signing, hardware FPS and physical Windows 10/11 visual QA are outside the
+automated offscreen checks. The build is unsigned.
