@@ -5,6 +5,7 @@ No code execution, external service or generated explanation is used.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+from fractions import Fraction
 import math
 from graphmath.persistence.projects import Function, Parameter, Project
 
@@ -134,8 +135,11 @@ def markers(v: dict[str,float], precision: int = 4) -> dict:
         x=-b/(2*a);y=c-b*b/(4*a)
         result['vertex']=[{'x':x,'y':y,'exact':f'Вершина ≈ ({n(x)}; {n(y)})'}]
         result['symmetry']=x
-        disc=b*b-4*a*c
-        if disc>=0:
+        # Slider decimals represent exact school coefficients; avoid losing a
+        # double root to floating cancellation (e.g. .1*x²+.6*x+.9).
+        exact_disc=Fraction(str(b))**2-4*Fraction(str(a))*Fraction(str(c))
+        disc=float(exact_disc)
+        if exact_disc>=0:
             # Stable quadratic roots avoid cancellation for disparate coefficients.
             if disc==0:
                 roots=[x]

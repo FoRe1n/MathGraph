@@ -57,7 +57,7 @@ interaction and hardware FPS are separate from offscreen validation.
 
 ## Validated PR candidate
 
-All **145 tests passed** locally after the final changes. Source smoke passed all
+All **147 tests passed** locally after the final changes. Source smoke passed all
 three learning modes, project serialization, preserved background analysis and
 PNG/SVG/PDF export. A Linux onedir MathLab build passed required-resource validation
 and frozen startup, including the symbolic subprocess. Native Windows and release
@@ -69,3 +69,5 @@ kept one curve/cache entry and showed **zero RSS growth** after settling and gar
 collection (16.99 seconds of scripted interaction). It is not an hours-long test.
 
 A custom formula with the same algebraic form as a laboratory retains its own parameter bounds. Entering a laboratory creates an independent record when those bounds differ; this is covered by core and GUI regression tests.
+
+Decimal discriminants are computed as exact rational values before numerical marker coordinates, preventing a false missing double root from floating cancellation. Coincident vertex/root/intercept markers share one visible point. Both cases have regressions.

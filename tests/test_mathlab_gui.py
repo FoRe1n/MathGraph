@@ -204,3 +204,8 @@ def test_entering_lab_preserves_custom_parameter_limits(lab,tmp_path):
     lab.path=str(tmp_path/'separate-parameters.graphmath')
     assert lab.save_project()
     assert custom.parameters['b'].maximum==5 and custom.parameters['b'].value==1
+
+
+def test_coincident_markers_use_one_visible_point(lab):
+    for key in ['vertex','zeros','intercept']:lab.learning.toggles[key].setChecked(True)
+    assert len(lab.lab_dots.points())==1

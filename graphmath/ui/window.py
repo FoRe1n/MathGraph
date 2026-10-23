@@ -365,6 +365,12 @@ class MainWindow(QMainWindow):
                 if self.learning.toggles[key].isChecked():points.extend(data[key])
             if self.learning.toggles['symmetry'].isChecked() and data['symmetry'] is not None:
                 self.lab_axis.setPos(data['symmetry']);self.lab_axis.show()
+            unique=[];seen=set()
+            for point in points:
+                coordinate=(point['x'],point['y'])
+                if coordinate not in seen:
+                    seen.add(coordinate);unique.append(point)
+            points=unique
             self.lab_dots.setData([p['x'] for p in points],[p['y'] for p in points],brush=self.canvas.display_color(function.color))
             self.lab_dots.show()
             for label,point in zip(self.lab_labels,points):

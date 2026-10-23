@@ -114,3 +114,9 @@ def test_custom_coefficient_bounds_are_not_mistaken_for_lab_defaults():
     from graphmath.persistence.projects import Function,Parameter
     f=Function('a*x^2+b*x+c',parameters={n:Parameter() for n in ['a','b','c']})
     assert identify(f)=='custom'
+
+
+def test_decimal_double_root_is_not_lost_to_floating_cancellation():
+    result=markers({'a':.1,'b':.6,'c':.9})
+    assert len(result['zeros'])==1
+    assert result['zeros'][0]['x']==pytest.approx(-3)
