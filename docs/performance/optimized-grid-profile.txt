@@ -1,0 +1,47 @@
+{
+  "startup_window_ms": 217.07512700049847,
+  "five_curve_drag_and_raster_paint": {
+    "True": {
+      "median_ms": 51.12827750008364,
+      "p95_ms": 53.80002800029615
+    },
+    "False": {
+      "median_ms": 23.465725500045664,
+      "p95_ms": 24.73399399968912
+    }
+  },
+  "peak_rss_kib": 198360
+}
+         682590 function calls (680052 primitive calls) in 3.030 seconds
+
+   Ordered by: cumulative time
+   List reduced from 388 to 24 due to restriction <24>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      162    0.001    0.000    2.821    0.017 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/widgets/GraphicsView.py:135(paintEvent)
+      162    0.089    0.001    2.804    0.017 {function GraphicsView.paintEvent at 0x7ff2ee5fcae0}
+      972    0.001    0.000    2.255    0.002 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/debug.py:115(w)
+      810    0.007    0.000    2.224    0.003 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/PlotCurveItem.py:798(paint)
+       82    0.047    0.001    1.689    0.021 {built-in method processEvents}
+      567    1.585    0.003    1.585    0.003 {method 'drawPath' of 'PySide6.QtGui.QPainter' objects}
+       80    0.026    0.000    1.253    0.016 {method 'grab' of 'PySide6.QtWidgets.QWidget' objects}
+      729    0.611    0.001    0.611    0.001 {method 'drawLines' of 'PySide6.QtGui.QPainter' objects}
+      324    0.006    0.000    0.304    0.001 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/AxisItem.py:663(paint)
+      164    0.054    0.000    0.223    0.001 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/AxisItem.py:968(generateDrawSpecs)
+ 1325/757    0.019    0.000    0.099    0.000 {method 'emit' of 'PySide6.QtCore.SignalInstance' objects}
+     2440    0.007    0.000    0.088    0.000 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/PlotCurveItem.py:297(boundingRect)
+       80    0.000    0.000    0.084    0.001 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/ViewBox/ViewBox.py:825(translateBy)
+       82    0.002    0.000    0.084    0.001 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/ViewBox/ViewBox.py:540(setRange)
+      162    0.025    0.000    0.078    0.000 /workspace/MathGraph/graphmath/ui/grid.py:26(paint)
+       82    0.001    0.000    0.078    0.001 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/ViewBox/ViewBox.py:1555(updateViewRange)
+    27220    0.041    0.000    0.057    0.000 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/Point.py:17(__init__)
+     1640    0.012    0.000    0.052    0.000 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/PlotCurveItem.py:211(dataBounds)
+      324    0.042    0.000    0.042    0.000 {method 'play' of 'PySide6.QtGui.QPicture' objects}
+      405    0.001    0.000    0.041    0.000 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/PlotCurveItem.py:614(getPath)
+      205    0.001    0.000    0.040    0.000 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/PlotCurveItem.py:598(generatePath)
+      205    0.022    0.000    0.039    0.000 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/functions.py:1952(arrayToQPath)
+      405    0.002    0.000    0.038    0.000 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/PlotDataItem.py:1189(viewRangeChanged)
+      415    0.003    0.000    0.036    0.000 /workspace/MathGraph/.venv/lib/python3.12/site-packages/pyqtgraph/graphicsItems/PlotDataItem.py:842(updateItems)
+
+
+

@@ -8,10 +8,14 @@ Choose a function, move its coefficients, and see both the curve and an explanat
 
 ## Windows distribution
 
-The new release target is **MathLab v1.0.0**, tag `mathlab-v1.0.0`, with portable
-`MathLab-v1.0.0-Windows-x64.zip` and `MathLab.exe`. The native Windows workflow
-must pass tests, resource checks and the frozen application smoke test before it
-publishes. Check [Releases](https://github.com/FoRe1n/MathGraph/releases) for status.
+**[Download MathLab v1.0.0 for Windows x64 (ZIP)](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.0.0/MathLab-v1.0.0-Windows-x64.zip)**
+([release notes and SHA256](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.0.0)).
+Extract the entire folder and double-click **MathLab.exe**. Python is not required.
+
+[Native Windows release CI](https://github.com/FoRe1n/MathGraph/actions/runs/39990444777)
+passed all 147 tests, offscreen benchmarks, source/frozen smoke checks and resource
+verification. The public ZIP was downloaded without authentication and its SHA256,
+all ZIP entries and Windows AMD64 executable header were independently verified.
 
 The original [GraphMath v1.0.0 release](https://github.com/FoRe1n/MathGraph/releases/tag/v1.0.0)
 and its tag remain available. Internal `graphmath` imports, the expression engine,
