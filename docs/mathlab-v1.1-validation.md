@@ -118,6 +118,24 @@ and verifies the release archive before uploading it. Publication is gated on
 the build job. The workflow also runs for the development branch so Windows
 validation can finish before a release tag is created.
 
-Native build and publication status are recorded below once verified; a local
-Linux test or successful workflow submission alone does not establish a Windows
-build or published release.
+The final release workflow for source commit
+`11822ffa4b39abddfd8dbe9a2a06bcd388ed982b` completed successfully:
+[Windows build and release](https://github.com/FoRe1n/MathGraph/actions/runs/40106809725).
+It passed version/dependency checks, the complete tests, benchmark, source smoke,
+screenshot capture, native PyInstaller build, resource verification, frozen smoke,
+ZIP verification, upload and release publication.
+
+Published [MathLab v1.1.0](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.0):
+[portable Windows ZIP](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.0/MathLab-v1.1.0-Windows-x64.zip).
+The public ZIP and SHA256SUMS.txt were downloaded without a GitHub login and
+independently checked with `scripts/verify_release_zip.py`: all 1,506 members passed
+CRC validation; the bundled Python/Qt runtime and AMD64 PE executable were present.
+
+SHA256: `de47f8457ab768c42fc4658af81bd3e6bcb45e294086fdcd4dc3b14f50456894`.
+
+The existing MathLab v1.0.0 and GraphMath v1.0.0 tag objects remained unchanged
+(`91e7ad593948947c88c5a3e5fddf87c3f61d5cdb` and
+`1f8b5055c3f56b5cf3a5556e4f82f1a380b1d7eb`, respectively). Main was not reset,
+merged or force-pushed. The release was built from the dedicated development
+branch. Windows checks use real Qt offscreen and the frozen executable; manual
+hardware desktop testing and code signing remain outside this validation.

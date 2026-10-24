@@ -1,4 +1,4 @@
-# MathLab 1.1 (development)
+# MathLab 1.1
 
 An offline Ukrainian mathematics laboratory for high school students, evolved
 incrementally from GraphMath in the existing **FoRe1n/MathGraph** repository.
@@ -25,11 +25,20 @@ panel. Changing coefficients preserves zoom and pan. Existing multiple-function
 editing, analysis, colors, visibility, history, themes and exports remain available.
 
 See [v1.1 validation and limitations](docs/mathlab-v1.1-validation.md).
-The Windows workflow targets `MathLab-v1.1.0-Windows-x64.zip`; publication requires
-a successful native Windows build. The verified stable v1.0 download below is
-preserved and is not a v1.1 build.
+The native Windows workflow has built and published `MathLab-v1.1.0-Windows-x64.zip`.
+The v1.0 download below remains available alongside v1.1.
 
 ## Windows distribution
+
+**[Download MathLab v1.1.0 for Windows x64 (ZIP)](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.0/MathLab-v1.1.0-Windows-x64.zip)**
+([release and checksums](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.0)).
+Extract the entire folder and double-click **MathLab.exe**. Python is not required.
+[Native Windows release CI](https://github.com/FoRe1n/MathGraph/actions/runs/40106809725)
+passed tests, benchmarks, source/frozen smoke and archive verification. The public
+ZIP was downloaded independently: SHA256, all 1,506 member CRCs, bundled runtime
+and Windows AMD64 executable header were verified.
+
+### Preserved MathLab 1.0 release
 
 **[Download MathLab v1.0.0 for Windows x64 (ZIP)](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.0.0/MathLab-v1.0.0-Windows-x64.zip)**
 ([release notes and SHA256](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.0.0)).
