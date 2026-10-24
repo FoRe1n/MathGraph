@@ -38,6 +38,8 @@ class FunctionRow(QFrame):
         self.eye.setToolTip("Показати / приховати функцію")
         self.eye.toggled.connect(lambda state: self.visibility.emit(function.id, state))
         label = QLabel("Відношення x = c" if function.expression.strip().startswith("x=") else f"f{index + 1}(x)")
+        self.kind_label=label
+        self.function_index=index
         label.setObjectName("muted")
         more = QToolButton()
         more.setText("⋯")
@@ -95,7 +97,8 @@ class FunctionRow(QFrame):
 
     def render(self):
         try:
-            parse(self.input.text())
+            expression=parse(self.input.text())
+            self.kind_label.setText("Відношення x = c" if expression.relation else f"f{self.function_index+1}(x)")
             self.error.hide()
             self.preview.update_expression(self.input.text(), self.text_color)
         except ExpressionError as exc:

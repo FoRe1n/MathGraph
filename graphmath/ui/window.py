@@ -556,7 +556,9 @@ class MainWindow(QMainWindow):
         self.invalidate_analysis()
         self.canvas.refresh(only=identifier)
         if identifier == self.project.selected:
-            self.active_label.setText(f"  f(x) = {source[:45]}  ")
+            try:relation=parse(source).relation
+            except ExpressionError:relation=False
+            self.active_label.setText(('  Відношення: ' if relation else '  f(x) = ')+source[:45]+'  ')
 
     def parameter_changed(self, name, parameter):
         function = self.current_function()
@@ -901,8 +903,12 @@ class MainWindow(QMainWindow):
             self.inspector.status.setText(str(exc))
             return
         other = next((f for f in self.project.functions if f.id == self.inspector.other.currentData()), None)
-        if other and parse(other.expression).relation:
-            self.inspector.status.setText('Для порівняння оберіть функцію y = f(x), а не вертикальну пряму.')
+        try:
+            if other and parse(other.expression).relation:
+                self.inspector.status.setText('Для порівняння оберіть функцію y = f(x), а не вертикальну пряму.')
+                return
+        except ExpressionError as exc:
+            self.inspector.status.setText(str(exc))
             return
         self.inspector.start(function.expression, {k: p.value for k, p in function.parameters.items()},
                              other.expression if other else None, {k: p.value for k, p in other.parameters.items()} if other else None)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import sympy as sp
 from sympy.calculus.util import continuous_domain, function_range
-from graphmath.core.expressions import parse, X
+from graphmath.core.expressions import parse, X, ExpressionError
 
 UNKNOWN = "Не вдалося визначити автоматично."
 
@@ -41,6 +41,8 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
     symbolic simplification cancels factors. Unsupported properties stay unknown.
     """
     parsed = parse(source)
+    if parsed.relation:
+        raise ExpressionError("Вертикальна пряма — відношення, а не функція y = f(x).")
     subs = {sp.Symbol(n, real=True): sp.Rational(str((parameters or {}).get(n, 1))) for n in parsed.parameters}
     expr = parsed.symbolic.subs(subs)
     domain = _safe(lambda: continuous_domain(expr, X, sp.S.Reals))
@@ -115,6 +117,8 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
     intersection_text = "Оберіть другу видиму функцію."
     if other:
         second_parsed = parse(other)
+        if second_parsed.relation:
+            raise ExpressionError("Для перетинів оберіть дві функції y = f(x).")
         other_values = {n: (other_parameters or {}).get(n, 1) for n in second_parsed.parameters}
         second = second_parsed.substitute(other_values)
         second_domain = _safe(lambda: continuous_domain(second, X, sp.S.Reals))

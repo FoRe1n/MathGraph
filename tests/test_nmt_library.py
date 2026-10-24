@@ -202,3 +202,29 @@ def test_numeric_formula_preserves_readable_transformation_form():
     formula=formula_latex('vertex',values('vertex',h=3,k=2))
     assert 'x-3' in formula and '0{,}333' not in formula
     assert formula_latex('vertical',values('vertical',c=-3))=='x=-3'
+
+
+
+def test_analysis_rejects_vertical_relations_as_functions():
+    from graphmath.analysis.symbolic import analyze
+    with pytest.raises(ExpressionError,match='відношення'):analyze('x=c',{'c':3})
+    with pytest.raises(ExpressionError,match='дві функції'):analyze('x^2',other='x=c',other_parameters={'c':3})
+
+
+def test_invalid_comparison_formula_is_reported_safely(window):
+    choose(window,'custom');window.add_function()
+    invalid=window.current_function();window.edit_function(invalid.id,'sin(')
+    window.select(window.project.functions[0].id)
+    window.inspector.other.setCurrentIndex(window.inspector.other.findData(invalid.id))
+    window.investigate()
+    assert 'дужки' in window.inspector.status.text()
+    assert window.inspector.process is None
+
+
+
+def test_custom_vertical_relation_label_is_not_a_function(window):
+    choose(window,'custom');window.use_example('x = 3')
+    row=window.rows[window.project.selected]
+    assert row.kind_label.text()=='Відношення x = c'
+    assert 'f(x)' not in window.active_label.text()
+    window.use_example('x^2');assert row.kind_label.text().startswith('f')
