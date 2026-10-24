@@ -3,7 +3,7 @@ import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Signal, QTimer, Qt
 from PySide6.QtGui import QFont, QColor
-from graphmath.core.expressions import evaluate
+from graphmath.core.expressions import evaluate, parse, relation_x
 from graphmath.plotting.sampling import sample
 from graphmath.ui.theme import PALETTES
 from graphmath.ui.grid import CoordinateGrid
@@ -178,6 +178,15 @@ class Canvas(pg.PlotWidget):
             if not f.visible or (only is not None and f.id != only) or (identifiers is not None and f.id not in identifiers):
                 continue
             parameters = {n: p.value for n, p in f.parameters.items()}
+            try:
+                if parse(f.expression).relation:
+                    x=relation_x(f.expression,parameters)
+                    self.curves[f.id].setData([x,x] if x is not None else [], [ymin,ymax] if x is not None else [])
+                    self.sample_cache.pop(f.id,None)
+                    continue
+            except Exception:
+                self.curves[f.id].setData([],[])
+                continue
             key = (f.expression, tuple(sorted(parameters.items())), self.width())
             cached = self.sample_cache.get(f.id)
             if not force and cached and cached['key'] == key:
@@ -234,6 +243,12 @@ class Canvas(pg.PlotWidget):
             return
         xmin, xmax = self.current_view()[:2]
         try:
+            if parse(function.expression).relation:
+                x=relation_x(function.expression,{n:p.value for n,p in function.parameters.items()})
+                if x is not None:
+                    ymin,ymax=self.current_view()[2:]
+                    self.set_view([x-5,x+5,ymin,ymax])
+                return
             y = evaluate(function.expression, np.linspace(xmin, xmax, 2000), {n: p.value for n, p in function.parameters.items()})
             y = y[np.isfinite(y)]
             if y.size:

@@ -35,7 +35,7 @@ class CoefficientControl(QWidget):
         self.value.valueChanged.connect(self.spin)
         self.value.editingFinished.connect(self.finished)
         self.slider.sliderReleased.connect(self.finished)
-        self.value.setToolTip('Додатна основа, відмінна від 1. Значення 1 автоматично замінюється на 1,1.' if control.base else f'Від {number(control.minimum)} до {number(control.maximum)}; крок {number(control.step)}')
+        self.value.setToolTip('Додатна основа, відмінна від 1. Значення 1 автоматично замінюється на 1,1.' if control.base else 'Горизонтальний масштаб не може дорівнювати нулю; 0 замінюється на 0,1.' if control.nonzero else f'Від {number(control.minimum)} до {number(control.maximum)}; крок {number(control.step)}')
 
     def spin(self,value):
         safe=self.control.clamp(value)
@@ -134,4 +134,4 @@ class LearningPanel(QWidget):
             self.numeric.update_latex(formula_latex(self.key,self.values,self.precision),self.color,size=13)
 
     def show_details(self):
-        QMessageBox.information(self,LABS[self.key].title,details(self.key))
+        QMessageBox.information(self,LABS[self.key].title,details(self.key,self.values))

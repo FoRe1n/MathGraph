@@ -29,10 +29,11 @@ class Expression:
     denominators: tuple[sp.Expr, ...]
     nonnegative: tuple[sp.Expr, ...]
     positive: tuple[sp.Expr, ...]
+    relation: bool = False
 
     @property
     def latex(self) -> str:
-        return sp.latex(self.symbolic)
+        return ("x=" if self.relation else "") + sp.latex(self.symbolic)
 
     def substitute(self, values: dict[str, float]) -> sp.Expr:
         return self.symbolic.subs({sp.Symbol(k, real=True): v for k, v in values.items()})
@@ -164,7 +165,8 @@ def parse(source: str) -> Expression:
         raise ExpressionError("Введіть функцію, наприклад x^2 − 4.")
     if len(source) > MAX_LENGTH:
         raise ExpressionError("Вираз задовгий (максимум 600 символів).")
-    normalized = normalize(source)
+    relation = bool(re.match(r"^x\s*=",source.strip()))
+    normalized = normalize(source.strip().split("=",1)[1] if relation else source)
     try:
         tree = ast.parse(normalized, mode="eval")
         if sum(1 for _ in ast.walk(tree)) > MAX_NODES:
@@ -173,8 +175,10 @@ def parse(source: str) -> Expression:
         symbolic = parser.visit(tree.body)
         if len(parser.parameters) > 6:
             raise ExpressionError("Максимум шість параметрів у функції.")
+        if relation and X in symbolic.free_symbols:
+            raise ExpressionError("Для вертикальної прямої введіть x = число або параметр, без x праворуч.")
         return Expression(source, symbolic, tuple(sorted(parser.parameters)), tuple(parser.denominators),
-                          tuple(parser.nonnegative), tuple(parser.positive))
+                          tuple(parser.nonnegative), tuple(parser.positive), relation)
     except ExpressionError:
         raise
     except (SyntaxError, ValueError, TypeError, OverflowError, RecursionError, ZeroDivisionError):
@@ -187,7 +191,7 @@ def _compiled(source: str):
     symbols = [X] + [sp.Symbol(n, real=True) for n in expression.parameters]
     # The expression has already been constructed solely through the allowlisted AST.
     fn = sp.lambdify(symbols, expression.symbolic, modules="numpy", cse=False)
-    guards = [(kind, sp.lambdify(symbols, item, modules="numpy"))
+    guards = [("pole" if kind == "denominator" and item.func == sp.cos else kind, sp.lambdify(symbols, item, modules="numpy"))
               for kind, items in [("denominator", expression.denominators),
                                   ("nonnegative", expression.nonnegative), ("positive", expression.positive)]
               for item in items]
@@ -197,6 +201,8 @@ def _compiled(source: str):
 def evaluate(source: str, x, parameters: dict[str, float] | None = None) -> np.ndarray:
     """Evaluate real values; undefined points are NaN, including removable holes."""
     expression, fn, guards = _compiled(source)
+    if expression.relation:
+        raise ExpressionError("Вертикальна пряма — це відношення x = c, а не функція y = f(x).")
     xx = np.asarray(x, dtype=float)
     values = parameters or {}
     args = [xx] + [float(values.get(n, 1.0)) for n in expression.parameters]
@@ -209,7 +215,7 @@ def evaluate(source: str, x, parameters: dict[str, float] | None = None) -> np.n
         for kind, guard in guards:
             v = np.asarray(guard(*args))
             valid &= np.isfinite(v)
-            valid &= (v != 0) if kind == "denominator" else ((v >= 0) if kind == "nonnegative" else (v > 0))
+            valid &= (np.abs(v)>1e-12) if kind == "pole" else (v != 0) if kind == "denominator" else ((v >= 0) if kind == "nonnegative" else (v > 0))
         return np.where(valid, result, np.nan)
 
 
@@ -219,4 +225,12 @@ def denominator_values(source: str, x, parameters: dict[str, float] | None = Non
     args = [xx] + [float((parameters or {}).get(n, 1)) for n in expression.parameters]
     with np.errstate(all="ignore"):
         return [np.broadcast_to(np.asarray(fn(*args), dtype=float), xx.shape)
-                for kind, fn in guards if kind == "denominator"]
+                for kind, fn in guards if kind in ("denominator", "pole")]
+
+
+def relation_x(source: str, parameters: dict[str,float] | None = None) -> float | None:
+    """Return the x coordinate of a vertical relation, never a y value."""
+    expression=parse(source)
+    if not expression.relation:return None
+    value=float(expression.substitute(parameters or {}))
+    return value if np.isfinite(value) else None

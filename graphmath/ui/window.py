@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QSettings, QSize, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QDockWidget, QScrollArea, QPushButton, QLabel, QToolBar, QToolButton, QFileDialog,
-    QMessageBox, QLineEdit, QAbstractSpinBox, QMenu, QDialog, QStackedWidget, QComboBox)
+    QMessageBox, QLineEdit, QAbstractSpinBox, QMenu, QDialog, QStackedWidget, QComboBox, QDoubleSpinBox, QGridLayout)
 from graphmath.core.expressions import parse, ExpressionError
 from graphmath.persistence.projects import Project, Function, Parameter, COLORS, from_dict, save, load
 from graphmath.plotting.export import export_graph
@@ -17,7 +17,7 @@ from graphmath.ui.inspector import Inspector
 from graphmath.ui.dialogs import SettingsDialog, ExportDialog
 from graphmath.ui.theme import apply_theme, PALETTES
 from graphmath.ui.icons import icon, PATHS
-from graphmath.core.laboratories import LABS, default_project, identify, markers, number, suggested_view
+from graphmath.core.laboratories import LABS, GROUPS, default_project, identify, markers, number, suggested_view
 from graphmath.ui.learning import LearningPanel
 
 
@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
         self.dirty = False
         self.rows = {}
         self.actions = {}
-        self.setWindowTitle("MathLab 1.0")
+        self.setWindowTitle("MathLab 1.1")
         self.resize(1400, 850)
         self.setMinimumSize(780, 540)
         self.canvas = Canvas()
@@ -65,6 +65,25 @@ class MainWindow(QMainWindow):
             button=QPushButton(label);button.setToolTip(tooltip);button.clicked.connect(callback)
             graph_header.addWidget(button)
         graph_layout.addLayout(graph_header)
+        ranges_toggle=QPushButton('Діапазон координат ▾');ranges_toggle.setCheckable(True)
+        graph_layout.addWidget(ranges_toggle,0,Qt.AlignLeft)
+        self.range_panel=QWidget();ranges=QGridLayout(self.range_panel)
+        ranges_toggle.toggled.connect(self.show_ranges)
+        self.range_fields={}
+        for i,(name,title) in enumerate([('xmin','X мінімум'),('xmax','X максимум'),('ymin','Y мінімум'),('ymax','Y максимум')]):
+            field=QDoubleSpinBox();field.setRange(-1e8,1e8);field.setDecimals(6)
+            field.setKeyboardTracking(False);field.setAccessibleName(title)
+            self.range_fields[name]=field
+            ranges.addWidget(QLabel(title),0,i);ranges.addWidget(field,1,i)
+        for i,(title,callback) in enumerate([('Застосувати',self.apply_ranges),('Скинути',self.reset_ranges),('Вмістити графік',self.fit_ranges)]):
+            button=QPushButton(title);button.clicked.connect(callback);ranges.addWidget(button,2,i)
+        self.range_error=QLabel();self.range_error.setObjectName('error');ranges.addWidget(self.range_error,3,0,1,4)
+        self.inspect_x=QDoubleSpinBox();self.inspect_x.setRange(-1e8,1e8);self.inspect_x.setDecimals(5)
+        self.inspect_x.setAccessibleName('Дослідити значення x')
+        inspect=QPushButton('Значення y при x =');inspect.clicked.connect(self.inspect_coordinate)
+        self.inspect_result=QLabel()
+        ranges.addWidget(inspect,4,0);ranges.addWidget(self.inspect_x,4,1);ranges.addWidget(self.inspect_result,4,2,1,2)
+        graph_layout.addWidget(self.range_panel);self.range_panel.hide()
         graph_layout.addWidget(self.canvas, 1)
         self.setCentralWidget(graph_area)
         self.create_editor()
@@ -128,6 +147,19 @@ class MainWindow(QMainWindow):
         self.list_layout.setSpacing(0)
         self.list_layout.addStretch()
         self.scroll.setWidget(self.list_widget)
+        intro=QLabel('Введіть свою формулу');intro.setContentsMargins(12,8,12,0)
+        layout.addWidget(intro)
+        hint=QLabel('Наприклад: x² − 4 або 2x + 1');hint.setObjectName('muted');hint.setContentsMargins(12,0,12,4)
+        layout.addWidget(hint)
+        examples=QWidget();example_layout=QGridLayout(examples);example_layout.setContentsMargins(12,2,12,4)
+        self.example_buttons={}
+        for i,expression in enumerate(['x²','2x + 1','sqrt(x)','1/x','2^x','log(x,2)','sin(x)']):
+            button=QPushButton(expression);button.clicked.connect(lambda checked=False,e=expression:self.use_example(e))
+            self.example_buttons[expression]=button;example_layout.addWidget(button,i//3,i%3)
+        layout.addWidget(examples)
+        variable_hint=QLabel('x — незалежна змінна: рухайтеся вздовж графіка. Для горизонтального зсуву використовуйте h у формулі x − h.')
+        variable_hint.setWordWrap(True);variable_hint.setObjectName('muted');variable_hint.setContentsMargins(12,0,12,4)
+        layout.addWidget(variable_hint)
         layout.addWidget(self.scroll, 1)
         add = QPushButton("＋  Додати функцію")
         add.setToolTip("Додати незалежну функцію (до 100)")
@@ -144,7 +176,9 @@ class MainWindow(QMainWindow):
             action = self.math_toolbar.addAction(title)
             action.setToolTip(text)
             action.triggered.connect(lambda checked=False, t=text, s=start, n=length: self.insert_math(t, s, n))
-        layout.addWidget(self.math_toolbar)
+        advanced=QPushButton('Математичні символи ▾');advanced.setCheckable(True)
+        layout.addWidget(advanced)
+        layout.addWidget(self.math_toolbar);self.math_toolbar.hide()
         second = QToolBar()
         second.setStyleSheet("QToolButton { padding: 4px; min-width: 22px; }")
         for title, text, start, length in [("ln", "ln(x)", 3, 1), ("sin", "sin(x)", 4, 1), ("cos", "cos(x)", 4, 1),
@@ -152,7 +186,8 @@ class MainWindow(QMainWindow):
             action = second.addAction(title)
             action.setToolTip(text)
             action.triggered.connect(lambda checked=False, t=text, s=start, n=length: self.insert_math(t, s, n))
-        layout.addWidget(second)
+        layout.addWidget(second);second.hide()
+        advanced.toggled.connect(self.math_toolbar.setVisible);advanced.toggled.connect(second.setVisible)
         self.parameter_container = QWidget()
         self.parameter_layout = QVBoxLayout(self.parameter_container)
         self.parameter_layout.setContentsMargins(12, 6, 12, 6)
@@ -174,8 +209,12 @@ class MainWindow(QMainWindow):
         hint.setObjectName('muted');hint.setWordWrap(True);hint.setContentsMargins(16,0,16,5)
         outer.addWidget(hint)
         self.mode_selector=QComboBox()
-        self.mode_selector.setAccessibleName('Тип функції')
-        for key,lab in LABS.items():self.mode_selector.addItem(lab.title,key)
+        selector_title=QLabel('Оберіть функцію');selector_title.setContentsMargins(16,0,16,0);outer.addWidget(selector_title)
+        self.mode_selector.setAccessibleName('Оберіть функцію')
+        for title,keys in GROUPS:
+            self.mode_selector.addItem(title,None)
+            self.mode_selector.model().item(self.mode_selector.count()-1).setEnabled(False)
+            for key in keys:self.mode_selector.addItem(LABS[key].title,key)
         self.mode_selector.addItem('Власна функція','custom')
         selector_layout=QHBoxLayout();selector_layout.setContentsMargins(16,0,16,0)
         selector_layout.addWidget(self.mode_selector);outer.addLayout(selector_layout)
@@ -246,7 +285,7 @@ class MainWindow(QMainWindow):
         view.addAction(self.actions["settings"])
         help_menu = self.menuBar().addMenu("Довідка")
         help_menu.addAction("Синтаксис і керування", self.help)
-        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.0", "MathLab 1.0.0\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
+        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.0\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
 
     def create_toolbar(self):
         toolbar=QToolBar('Основні дії',self)
@@ -263,6 +302,41 @@ class MainWindow(QMainWindow):
         toolbar.addAction(self.actions['settings'])
         self.main_toolbar=toolbar
 
+    def show_ranges(self, visible):
+        if visible:
+            for field,value in zip(self.range_fields.values(),self.canvas.current_view()):field.setValue(value)
+        self.range_panel.setVisible(visible)
+
+    def reset_ranges(self):
+        self.reset_view();self.show_ranges(True);self.range_error.clear()
+
+    def fit_ranges(self):
+        self.canvas.fit_selected();self.show_ranges(True);self.range_error.clear()
+
+    def apply_ranges(self):
+        view=[field.value() for field in self.range_fields.values()]
+        if view[1]-view[0]<1e-6 or view[3]-view[2]<1e-6:
+            self.range_error.setText('Мінімум має бути меншим за максимум; ширина кожного діапазону — щонайменше 0,000001.')
+            return False
+        self.range_error.clear();self.canvas.set_view(view)
+        return True
+
+    def inspect_coordinate(self):
+        from graphmath.core.expressions import evaluate
+        function=self.current_function()
+        if not function:return
+        try:
+            y=float(evaluate(function.expression,self.inspect_x.value(),{n:p.value for n,p in function.parameters.items()}))
+            self.inspect_result.setText('y ≈ '+number(y,self.preferences['precision']) if np.isfinite(y) else 'Не визначено для цього x')
+        except ExpressionError:
+            self.inspect_result.setText('Оберіть коректну функцію y = f(x)')
+
+    def use_example(self, expression):
+        if not self.current_function():self.add_function()
+        function=self.current_function()
+        if function:
+            row=self.rows[function.id];row.input.setText(expression);row.commit();row.input.setFocus();self.scroll.ensureWidgetVisible(row)
+
     def reset_view(self):
         function=self.current_function()
         view=suggested_view(self.mode,{n:p.value for n,p in function.parameters.items()}) if self.mode in LABS and function else self.preferences['default_view']
@@ -270,6 +344,7 @@ class MainWindow(QMainWindow):
 
     def mode_changed(self, *_):
         key=self.mode_selector.currentData()
+        if key is None:return
         self.flush_inputs()
         self.flush_history()
         if key in LABS:
@@ -314,6 +389,7 @@ class MainWindow(QMainWindow):
         control=next(c for c in LABS[self.mode].controls if c.name==name)
         value=control.clamp(value)
         function.parameters[name].value=value
+        self.learning.controls[name].set_value(value)
         self.learning.update_values({c.name:function.parameters[c.name].value for c in LABS[self.mode].controls})
         self.dirty=True
         self.update_title()
@@ -421,8 +497,7 @@ class MainWindow(QMainWindow):
             names = parse(function.expression).parameters
         except ExpressionError:
             names = ()
-        for name in names:
-            function.parameters.setdefault(name, Parameter())
+        function.parameters={name:function.parameters.get(name,Parameter(value=0,initial=0) if name in ('h','k') else Parameter()) for name in names}
         if not names:
             self.parameter_scroll.hide()
             return
@@ -618,7 +693,7 @@ class MainWindow(QMainWindow):
     def update_title(self):
         dirty = self.dirty
         filename = Path(self.path).name if self.path else "Без назви"
-        title=f"{'● ' if dirty else ''}{filename} — MathLab 1.0"
+        title=f"{'● ' if dirty else ''}{filename} — MathLab 1.1"
         if title!=self.windowTitle():self.setWindowTitle(title)
         self.actions["undo"].setEnabled(True)
         self.actions["redo"].setEnabled(True)
@@ -819,11 +894,16 @@ class MainWindow(QMainWindow):
         if not function:
             return
         try:
-            parse(function.expression)
+            if parse(function.expression).relation:
+                self.inspector.status.setText('Вертикальна пряма — відношення x = c. Її властивості наведені в розділі «Докладніше».')
+                return
         except ExpressionError as exc:
             self.inspector.status.setText(str(exc))
             return
         other = next((f for f in self.project.functions if f.id == self.inspector.other.currentData()), None)
+        if other and parse(other.expression).relation:
+            self.inspector.status.setText('Для порівняння оберіть функцію y = f(x), а не вертикальну пряму.')
+            return
         self.inspector.start(function.expression, {k: p.value for k, p in function.parameters.items()},
                              other.expression if other else None, {k: p.value for k, p in other.parameters.items()} if other else None)
 

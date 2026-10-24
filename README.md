@@ -1,10 +1,33 @@
-# MathLab 1.0
+# MathLab 1.1 (development)
 
 An offline Ukrainian mathematics laboratory for high school students, evolved
 incrementally from GraphMath in the existing **FoRe1n/MathGraph** repository.
 Choose a function, move its coefficients, and see both the curve and an explanation.
 
 ![MathLab quadratic laboratory](docs/screenshots/mathlab/quadratic-light.png)
+
+## MathLab 1.1 changes
+
+The existing workspace now includes a grouped **Оберіть функцію** selector with
+20 templates: linear/direct/constant, vertical relations, inverse proportionality,
+quadratic standard/square/vertex forms, cubic, absolute value, three square-root
+orientations, original and transformed exponential/logarithmic forms, sine, cosine
+and tangent. Original laboratories and version-1 projects remain supported.
+
+Transformation controls explain horizontal and vertical movement; trigonometric
+angles use radians. **Докладніше** reports properties for the current coefficients,
+including degenerate cases. Vertical `x=c` relations render separately and are never
+evaluated as `y=f(x)`. Tangent and rational paths retain discontinuity separators.
+
+**Власна функція** offers clickable examples and automatic parameter sliders.
+Coordinate ranges and point inspection live in the collapsed **Діапазон координат**
+panel. Changing coefficients preserves zoom and pan. Existing multiple-function
+editing, analysis, colors, visibility, history, themes and exports remain available.
+
+See [v1.1 validation and limitations](docs/mathlab-v1.1-validation.md).
+The Windows workflow targets `MathLab-v1.1.0-Windows-x64.zip`; publication requires
+a successful native Windows build. The verified stable v1.0 download below is
+preserved and is not a v1.1 build.
 
 ## Windows distribution
 

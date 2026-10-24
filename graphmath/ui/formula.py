@@ -16,7 +16,7 @@ def formula_png(latex: str, color: str = "#24272D", size: int = 13) -> bytes:
     fig = Figure(figsize=(4, 0.65), dpi=140)
     FigureCanvasAgg(fig)
     fig.patch.set_alpha(0)
-    text = fig.text(0, 0.5, f"$y = {latex}$", color=color, fontsize=size, va="center", math_fontfamily="dejavusans")
+    text = fig.text(0, 0.5, f"${latex if latex.startswith('x=') else 'y = '+latex}$", color=color, fontsize=size, va="center", math_fontfamily="dejavusans")
     fig.canvas.draw()
     bounds = text.get_window_extent(fig.canvas.get_renderer()).expanded(1.06, 1.2).transformed(fig.dpi_scale_trans.inverted())
     output = BytesIO()

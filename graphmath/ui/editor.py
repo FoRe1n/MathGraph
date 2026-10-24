@@ -37,7 +37,7 @@ class FunctionRow(QFrame):
         self.eye.setChecked(function.visible)
         self.eye.setToolTip("Показати / приховати функцію")
         self.eye.toggled.connect(lambda state: self.visibility.emit(function.id, state))
-        label = QLabel(f"f{index + 1}(x)")
+        label = QLabel("Відношення x = c" if function.expression.strip().startswith("x=") else f"f{index + 1}(x)")
         label.setObjectName("muted")
         more = QToolButton()
         more.setText("⋯")

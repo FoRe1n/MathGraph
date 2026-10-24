@@ -86,7 +86,8 @@ def from_dict(data: dict) -> Project:
         if selected is not None and selected not in ids:
             raise ValueError("Вибрана функція відсутня у проєкті.")
         mode=data.get('mode','custom')
-        if mode not in ('custom','quadratic','exponential','logarithmic'):
+        from graphmath.core.laboratories import LABS
+        if mode not in ('custom', *LABS):
             raise ValueError('Невідомий режим математичного проєкту.')
         return Project(functions, view, data.get("grid", True), data.get("axes", True), selected, mode)
     except (KeyError, TypeError, AttributeError) as exc:
