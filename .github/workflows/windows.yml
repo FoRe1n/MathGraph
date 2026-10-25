@@ -47,14 +47,31 @@ jobs:
         run: python -m PyInstaller --noconfirm --clean GraphMath.spec
       - name: Verify packaged resources
         run: python scripts/verify_distribution.py dist/MathLab
-      - name: Frozen application smoke test
+      - name: Frozen application smoke test outside checkout without Python on PATH
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath dist/MathLab/MathLab.exe -ArgumentList '--smoke-test','--smoke-output','artifacts/frozen-smoke' -PassThru
-          if (-not $process.WaitForExit(90000)) { $process.Kill(); throw 'Frozen startup timed out' }
-          if ($process.ExitCode -ne 0) { throw "Frozen smoke exit code: $($process.ExitCode)" }
-          $result = Get-Content artifacts/frozen-smoke/result.json | ConvertFrom-Json
-          if ($result.status -ne 'passed') { throw 'Frozen smoke results missing or failed' }
+          $exePath = (Resolve-Path dist/MathLab/MathLab.exe).Path
+          $smokeOutput = Join-Path $env:GITHUB_WORKSPACE 'artifacts/frozen-smoke'
+          $frozenWorkingDir = Join-Path $env:RUNNER_TEMP 'mathlab-frozen-validation'
+          New-Item -ItemType Directory -Path $frozenWorkingDir -Force | Out-Null
+          $savedPath = $env:PATH
+          $savedPythonPath = $env:PYTHONPATH
+          $savedPythonHome = $env:PYTHONHOME
+          try {
+            $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+            $env:PYTHONPATH = ''
+            $env:PYTHONHOME = ''
+            $arguments = @('--smoke-test', '--smoke-output', ('"' + $smokeOutput + '"'))
+            $process = Start-Process -FilePath $exePath -WorkingDirectory $frozenWorkingDir -ArgumentList $arguments -PassThru
+            if (-not $process.WaitForExit(90000)) { $process.Kill(); throw 'Frozen startup timed out' }
+            if ($process.ExitCode -ne 0) { throw "Frozen smoke exit code: $($process.ExitCode)" }
+            $result = Get-Content (Join-Path $smokeOutput 'result.json') | ConvertFrom-Json
+            if ($result.status -ne 'passed' -or -not $result.ui_glyph_coverage) { throw 'Frozen smoke or UI font verification failed' }
+          } finally {
+            $env:PATH = $savedPath
+            $env:PYTHONPATH = $savedPythonPath
+            $env:PYTHONHOME = $savedPythonHome
+          }
       - name: Package portable ZIP
         shell: pwsh
         run: |
