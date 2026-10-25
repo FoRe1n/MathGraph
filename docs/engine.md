@@ -29,7 +29,9 @@ only expressions already built by this visitor. Original domain guards are kept
 separately, including removable rational holes.
 
 Input is bounded to 600 characters, 100 AST nodes, 18 visitor levels, six parameters,
-constant powers up to 100 in magnitude and roots of order 2–15. The compiled and
+constant powers up to 100 in magnitude and roots of order 2–15. An additional constant-arithmetic preflight limits exact-number expansion
+to a 4,096-bit cost budget and rejects numerical overflow/underflow before SymPy
+can expand nested powers. The compiled and
 render caches have 256 entries. Ordinary numerical evaluation is vectorized;
 sampling uses 1,000–16,000 points depending on viewport width, midpoint checks,
 denominator crossings and offscreen safeguards. A finite sampler cannot prove
@@ -75,10 +77,35 @@ before the same allowlisted AST visitor; names are never split heuristically and
 attribute/import/container syntax remains rejected. Decimal literals in custom
 expressions use a dot. Ukrainian Qt numeric controls use the locale's comma.
 
-Version-1 documents optionally store `mode` (`custom`, `quadratic`, `exponential`,
-`logarithmic`). Missing metadata means `custom`, preserving old projects with all
+Version-1 documents optionally store `mode` (`custom` or a key from `LABS`). Missing metadata means `custom`, preserving old projects with all
 visible curves. Mathematical records, colors, parameter definitions, IDs, view and
-atomic save semantics remain unchanged. Older GraphMath loaders ignore the added
-field. New Unicode/implicit custom syntax requires MathLab's new normalization.
+atomic save semantics remain unchanged. Original GraphMath loaders ignore the added field; older MathLab readers may
+reject newer mode names or relation syntax. New Unicode/implicit custom syntax
+requires MathLab's normalization.
 The original analysis `properties` API is preserved; `display_properties` adds
 readable Unicode mathematics for the desktop inspector.
+
+
+## Stabilization details
+
+Decimal literals retain exact rational coefficients when constructing symbolic
+expressions. Numeric exponent arithmetic is reduced before checking the exponent
+and real domain; rational powers with an odd denominator use the school real-root
+convention. Denominator guards preserve poles after cancellation. Affine sine,
+cosine and tangent denominator phases prevent bridges even when several poles
+fall inside one sampling interval; arbitrary nonlinear excursions remain subject
+to finite-sampling limits.
+
+A parsed vertical relation has `Expression.relation=True`. Use `relation_x()` to
+obtain its finite, domain-checked coordinate; ordinary `evaluate()` and `analyze()`
+reject it as a y function. Plotting uses cached compiled numeric evaluation rather
+than repeated symbolic substitution.
+
+Oscillatory limiting ranges are not scalar horizontal asymptotes. Symbolic
+monotonicity results covering only one period are not reported as global sets.
+Unsupported ordinary derivatives of sign/absolute real-root representations are
+reported as unknown instead of exposing distributional artifacts.
+
+Graph export synchronizes pending canvas work, restores final-quality curves,
+and atomically replaces the destination. A failed export leaves the existing
+file intact. Cursor inspection decorations are excluded from exports.

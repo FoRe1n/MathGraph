@@ -1,0 +1,124 @@
+"""Capture real MathLab Qt screenshots for the stabilization visual review.
+
+No mockups are generated. Temporary settings avoid changing user preferences.
+The manifest records each capture's dimensions and scenario. Use
+MATHLAB_BENCH_SOURCE to inspect an archived implementation with the same runner.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+os.environ.setdefault('XDG_CACHE_HOME', str(Path(tempfile.gettempdir()) / 'mathlab-audit-cache'))
+sys.path.insert(0, os.environ.get('MATHLAB_BENCH_SOURCE', str(Path(__file__).resolve().parents[1])))
+
+
+def run(output):
+    from PySide6.QtCore import QSettings
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QPushButton
+    from graphmath.app.localization import install_ukrainian
+    from graphmath.core.laboratories import LABS
+    from graphmath.persistence.projects import Function, Project
+    from graphmath.ui.dialogs import ExportDialog, SettingsDialog
+    from graphmath.ui.window import MainWindow
+
+    app = QApplication.instance() or QApplication([])
+    app.setStyle('Fusion'); install_ukrainian(app)
+    output.mkdir(parents=True, exist_ok=True)
+    captures = []
+    callback_errors = []
+    previous_hook = sys.excepthook
+    def record_callback_error(kind, value, traceback):
+        callback_errors.append(f'{kind.__name__}: {value}')
+        previous_hook(kind, value, traceback)
+    sys.excepthook = record_callback_error
+    with tempfile.TemporaryDirectory(prefix='mathlab-visual-audit-') as temp:
+        window = MainWindow(QSettings(str(Path(temp) / 'settings.ini'), QSettings.IniFormat))
+        window.show(); QTest.qWait(260)
+        try:
+            def capture(name, target=None, description=''):
+                widget = target or window
+                app.processEvents(); QTest.qWait(180)
+                if callback_errors:
+                    raise RuntimeError('Qt callback errors: '+'; '.join(callback_errors))
+                path = output / (name + '.png')
+                pixmap = widget.grab()
+                if pixmap.isNull() or not pixmap.save(str(path)):
+                    raise RuntimeError('Screenshot capture failed: '+name)
+                captures.append({'file': path.name, 'width': pixmap.width(), 'height': pixmap.height(),
+                                 'theme': window.preferences['theme'], 'scale': window.preferences['scale'],
+                                 'mode': window.mode, 'description': description})
+
+            capture('startup', description='Unmodified default startup screen.')
+            for theme in ('light', 'dark'):
+                window.set_theme(theme)
+                for key in LABS:
+                    window.mode_selector.setCurrentIndex(window.mode_selector.findData(key))
+                    assert window.mode == key
+                    capture(f'{key}-{theme}', description=LABS[key].title)
+                window.mode_selector.setCurrentIndex(window.mode_selector.findData('custom'))
+                function = Function('a*(x-h)^2+k')
+                window.project = Project([function], [-6,6,-3,9], selected=function.id, mode='custom')
+                window.reset_document()
+                capture(f'custom-{theme}', description='Custom editor with automatic a, h, k sliders.')
+                row = window.rows[window.project.selected]
+                row.input.setText('sqrt('); row.commit()
+                capture(f'custom-error-{theme}', description='Incomplete formula and Ukrainian error message.')
+                row.input.setText('a*(x-h)^2+k'); row.commit()
+                values = {**window.preferences, 'grid': window.project.grid, 'axes': window.project.axes}
+                for name, dialog in [('settings', SettingsDialog(window, values)), ('export', ExportDialog(window))]:
+                    dialog.show()
+                    capture(f'{name}-{theme}', target=dialog, description='Existing '+name+' dialog.')
+                    if name == 'settings':
+                        advanced = next((button for button in dialog.findChildren(QPushButton)
+                                         if button.isCheckable()), None)
+                        if advanced:
+                            advanced.setChecked(True)
+                            capture(f'{name}-advanced-{theme}', target=dialog, description='Expanded existing settings.')
+                    dialog.close(); dialog.deleteLater()
+
+            window.set_theme('light')
+            window.mode_selector.setCurrentIndex(window.mode_selector.findData('vertex'))
+            window.learning.controls['h'].value.setValue(3)
+            window.learning.controls['k'].value.setValue(2)
+            window.reset_view()
+            capture('transformed-vertex', description='a=1, h=3, k=2; vertex at (3,2).')
+            window.canvas.viewbox.scaleBy((.25,.25))
+            capture('zoomed-in', description='Quarter-size viewport spans after zooming in.')
+            window.canvas.viewbox.scaleBy((16,16))
+            capture('zoomed-out', description='Four times reset viewport spans after zooming out.')
+            if hasattr(window, 'show_ranges'):
+                window.show_ranges(True)
+                capture('coordinate-ranges', description='Expanded existing manual X/Y controls.')
+                window.show_ranges(False)
+
+            for scale in ('100%', '125%', '150%'):
+                window.preferences['scale'] = scale
+                for theme in ('light', 'dark'):
+                    window.set_theme(theme); window.resize(780,540)
+                    capture(f'narrow-{scale[:-1]}-{theme}', description='Minimum-size window with text scaling.')
+            return captures
+        finally:
+            window.confirm_discard = lambda: True
+            window.close(); app.processEvents()
+            sys.excepthook = previous_hook
+            if callback_errors:
+                raise RuntimeError('Qt callback errors: '+'; '.join(callback_errors))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, default=Path('artifacts/audit/screenshots'))
+    args = parser.parse_args()
+    (args.output/'manifest.json').unlink(missing_ok=True)
+    captures = run(args.output)
+    manifest = {'status': 'passed', 'real_qt_captures': len(captures), 'qt_backend': os.environ['QT_QPA_PLATFORM'],
+                'source_root': str(Path(sys.path[0]).resolve()), 'captures': captures}
+    (args.output/'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    print(json.dumps({'status': 'passed', 'captures': len(captures), 'output': str(args.output)}))

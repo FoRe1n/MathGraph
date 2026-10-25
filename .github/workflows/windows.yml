@@ -1,7 +1,7 @@
 name: MathLab Windows portable build
 on:
   push:
-    branches: [main, feature/mathlab-v1.1]
+    branches: [main, feature/mathlab-v1.1, fix/mathlab-v1.1.1-audit]
     tags: ['v*', 'mathlab-v*']
   pull_request:
   workflow_dispatch:
@@ -28,17 +28,19 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF_NAME -ne 'mathlab-v1.1.0') { throw 'This source version builds MathLab v1.1.0 only' }
+          if ($env:GITHUB_REF_NAME -ne 'mathlab-v1.1.1') { throw 'This source version builds MathLab v1.1.1 only' }
       - name: Install verified locked dependencies
         run: python -m pip install --require-hashes -r requirements-windows.lock
       - name: Test mathematics, project files and desktop workflows
         run: python -m pytest -q --junitxml=artifacts/tests.xml
       - name: Measure offscreen interactions
         run: python scripts/benchmark_interaction.py --output artifacts/interaction-benchmark.json --frames 30
+      - name: Measure stabilization workloads
+        run: python scripts/benchmark_stabilization.py --frames 20 --output artifacts/stabilization-benchmark.json
       - name: Source application smoke test
         run: python -m graphmath --smoke-test --smoke-output artifacts/source-smoke
       - name: Capture actual learning workspace screenshots
-        run: python scripts/capture_mathlab_qa.py
+        run: python scripts/capture_stabilization_qa.py --output artifacts/screenshots
       - name: Collect bundled license notices
         run: python scripts/collect_licenses.py build/licenses
       - name: Build portable application
@@ -58,17 +60,17 @@ jobs:
         run: |
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.md dist/MathLab/
           Copy-Item docs/user-guide.uk.md dist/MathLab/ПОСІБНИК.md
-          Compress-Archive -Path dist/MathLab -DestinationPath MathLab-v1.1.0-Windows-x64.zip
-          if ((Get-Item MathLab-v1.1.0-Windows-x64.zip).Length -lt 1000000) { throw 'Archive is unexpectedly small' }
-          $hash = (Get-FileHash MathLab-v1.1.0-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  MathLab-v1.1.0-Windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
+          Compress-Archive -Path dist/MathLab -DestinationPath MathLab-v1.1.1-Windows-x64.zip
+          if ((Get-Item MathLab-v1.1.1-Windows-x64.zip).Length -lt 1000000) { throw 'Archive is unexpectedly small' }
+          $hash = (Get-FileHash MathLab-v1.1.1-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  MathLab-v1.1.1-Windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
       - name: Verify portable ZIP, SHA256, runtime and AMD64 executable
-        run: python scripts/verify_release_zip.py MathLab-v1.1.0-Windows-x64.zip SHA256SUMS.txt
+        run: python scripts/verify_release_zip.py MathLab-v1.1.1-Windows-x64.zip SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: MathLab-v1.1.0-Windows-x64
+          name: MathLab-v1.1.1-Windows-x64
           path: |
-            MathLab-v1.1.0-Windows-x64.zip
+            MathLab-v1.1.1-Windows-x64.zip
             SHA256SUMS.txt
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -86,10 +88,16 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: MathLab-v1.1.0-Windows-x64
+          name: MathLab-v1.1.1-Windows-x64
           path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: validation-evidence
+          path: validation-evidence
+      - name: Archive Windows validation evidence
+        run: python3 -c "import shutil; shutil.make_archive('release/MathLab-v1.1.1-validation', 'zip', 'validation-evidence')"
       - name: Publish verified Windows release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "MathLab v1.1.0" --notes 'Portable Windows x64. Extract the ZIP and double-click MathLab.exe. No Python installation is required. Includes the NMT function library, horizontal and vertical transformations, vertical relations, coordinate range controls, beginner formula examples, Ukrainian explanations, efficient raster rendering, custom functions, backward-compatible .graphmath projects, analysis, and PNG/SVG/PDF export. The GraphMath v1.0.0 and MathLab v1.0.0 releases remain available. Unsigned build. See bundled user guide and license notices.' release/MathLab-v1.1.0-Windows-x64.zip release/SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "MathLab v1.1.1" --notes 'Stabilization release with no new function categories. Fixes expression domains and analysis, decimal roots, discontinuity rendering, custom parameter precision and undo, malformed settings/projects, worker cleanup and atomic graph exports. Preserves MathLab 1.1 functionality and previous releases. Portable Windows x64: extract the ZIP and launch MathLab.exe, no Python installation required. Native Windows tests, benchmarks, source/frozen smoke and archive verification must pass before publication. Unsigned build; see the bundled user guide and notices.' release/MathLab-v1.1.1-Windows-x64.zip release/SHA256SUMS.txt release/MathLab-v1.1.1-validation.zip

@@ -12,7 +12,12 @@ python -m venv .venv
 .venv\Scripts\python -m PyInstaller --noconfirm --clean GraphMath.spec
 .venv\Scripts\python scripts/verify_distribution.py dist/MathLab
 dist\MathLab\MathLab.exe --smoke-test --smoke-output artifacts/frozen-smoke
-Compress-Archive dist/MathLab MathLab-v1.0.0-Windows-x64.zip
+Copy-Item LICENSE,THIRD_PARTY_NOTICES.md dist/MathLab/
+Copy-Item docs/user-guide.uk.md dist/MathLab/ПОСІБНИК.md
+Compress-Archive dist/MathLab MathLab-v1.1.1-Windows-x64.zip
+$hash = (Get-FileHash MathLab-v1.1.1-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+"$hash  MathLab-v1.1.1-Windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
+.venv\Scripts\python scripts/verify_release_zip.py MathLab-v1.1.1-Windows-x64.zip SHA256SUMS.txt
 ```
 
 PyInstaller cannot cross-compile Linux to Windows. The GitHub Actions workflow
@@ -22,10 +27,12 @@ a windowed onedir bundle, verifies qwindows.dll, mathematical fonts, Ukrainian Q
 translations and license files, then runs the frozen EXE before making the ZIP.
 Failure prevents release publication.
 
-Pull requests build validation artifacts. After validated changes are merged,
-tag **mathlab-v1.0.0** publishes **MathLab v1.0.0** and
-`MathLab-v1.0.0-Windows-x64.zip` plus SHA256SUMS. The old `v1.0.0` tag and GraphMath
-release are not changed. The build job has read-only repository permission; only
+Pull requests build validation artifacts. After native Windows checks pass for the reviewed source,
+tag **mathlab-v1.1.1** publishes **MathLab v1.1.1** and
+`MathLab-v1.1.1-Windows-x64.zip` plus SHA256SUMS and `MathLab-v1.1.1-validation.zip`. The latter
+contains Windows test XML, benchmarks, source/frozen smoke results and real Qt
+screenshots. Existing MathLab v1.1.0/v1.0.0 and GraphMath v1.0.0 releases remain
+unchanged. The build job has read-only repository permission; only
 the release job receives `contents: write`. Existing releases are not overwritten.
 
 The complete extracted folder is required; users double-click MathLab.exe without

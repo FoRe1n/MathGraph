@@ -25,7 +25,7 @@ def main():
     app.setApplicationName("MathLab")
     from graphmath.app.localization import install_ukrainian
     install_ukrainian(app)
-    app.setApplicationVersion("1.1.0")
+    app.setApplicationVersion("1.1.1")
     app.setOrganizationName("GraphMath")
     app.setStyle("Fusion")
     output = Path(args.smoke_output)
@@ -86,7 +86,7 @@ def main():
                 window.toggle_theme()
                 app.processEvents()
                 window.grab().save(str(output / "workspace-dark.png"))
-                (output / "result.json").write_text(json.dumps({"status": "passed", "version": "1.1.0", "exports": ["png", "svg", "pdf"], "project_roundtrip": True, "analysis_subprocess": True, "laboratory_modes": list(LABS), "application": "MathLab"}), encoding="utf-8")
+                (output / "result.json").write_text(json.dumps({"status": "passed", "version": "1.1.1", "exports": ["png", "svg", "pdf"], "project_roundtrip": True, "analysis_subprocess": True, "laboratory_modes": list(LABS), "application": "MathLab"}), encoding="utf-8")
                 window.flush_inputs()
                 window.saved_state = window.serialized()
                 window.close()
