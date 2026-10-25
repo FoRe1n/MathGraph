@@ -1,7 +1,7 @@
 """Viewport-aware sampling, isolated from the desktop renderer."""
 from __future__ import annotations
 import numpy as np
-from graphmath.core.expressions import evaluate, denominator_values
+from graphmath.core.expressions import evaluate, denominator_values, tangent_arguments
 
 
 def sample(source: str, xmin: float, xmax: float, parameters=None, *,
@@ -23,6 +23,14 @@ def sample(source: str, xmin: float, xmax: float, parameters=None, *,
     for d in denominator_values(source, x, parameters):
         bad |= ~np.isfinite(d[:-1]) | ~np.isfinite(d[1:])
         bad |= (np.signbit(d[:-1]) != np.signbit(d[1:])) | (d[:-1] == 0) | (d[1:] == 0)
+    # Endpoint cosine signs alone miss an even number of tangent poles in a
+    # sample interval. Phase bins retain every affine-phase branch boundary,
+    # including at extreme zoom-out or large custom frequency values.
+    for phase in tangent_arguments(source, x, parameters):
+        with np.errstate(all="ignore"):
+            branch = np.floor((phase + np.pi/2) / np.pi)
+            bad |= (~np.isfinite(phase[:-1]) | ~np.isfinite(phase[1:])
+                    | (branch[:-1] != branch[1:]))
     with np.errstate(all="ignore"):
         bad |= (np.abs(ym - (y[:-1] + y[1:]) / 2) > span * 0.5)
         bad |= (np.abs(np.diff(y)) > span * 3)

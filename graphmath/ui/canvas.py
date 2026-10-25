@@ -22,8 +22,8 @@ class Canvas(pg.PlotWidget):
         self.setMinimumWidth(280)
         self.plotItem.setMenuEnabled(False)
         self.plotItem.hideButtons()
-        self.plotItem.setLabel("bottom", "x — аргумент")
-        self.plotItem.setLabel("left", "y — значення функції")
+        self.plotItem.setLabel("bottom", "x — горизонтальна вісь")
+        self.plotItem.setLabel("left", "y — вертикальна вісь")
         self.plotItem.setDownsampling(auto=True, mode="peak")
         self.plotItem.setClipToView(True)
         self.viewbox = self.plotItem.getViewBox()
@@ -113,6 +113,8 @@ class Canvas(pg.PlotWidget):
         self.plotItem.showAxis("bottom", axes)
 
     def update_functions(self, functions, selected):
+        if selected != self.selected_id or self.coordinates_enabled:
+            self.hover_dot.setData([], [])
         self.functions = functions
         self.selected_id = selected
         ids = {f.id for f in functions}
@@ -139,6 +141,8 @@ class Canvas(pg.PlotWidget):
         return color
 
     def begin_interaction(self, only=None):
+        if self.coordinates_enabled and len(self.hover_dot.data):
+            self.hover_dot.setData([], [])
         if not self.interacting:
             self.interacting=True
             for curve in self.curves.values():
@@ -186,6 +190,7 @@ class Canvas(pg.PlotWidget):
                     continue
             except Exception:
                 self.curves[f.id].setData([],[])
+                self.sample_cache.pop(f.id, None)
                 continue
             key = (f.expression, tuple(sorted(parameters.items())), self.width())
             cached = self.sample_cache.get(f.id)
@@ -209,6 +214,18 @@ class Canvas(pg.PlotWidget):
                 self.sample_cache.pop(f.id, None)
         self.curves_updated.emit()
 
+    def prepare_export(self):
+        """Synchronize queued edits and restore final-quality paths for a snapshot."""
+        self.resample_timer.stop()
+        self.refine_timer.stop()
+        self.pending_functions.clear()
+        self.refine_ids.clear()
+        self.interacting=False
+        for curve in self.curves.values():
+            curve.opts['antialias']=True
+            curve.curve.opts['antialias']=True
+        self.refresh(force=True)
+
     def set_coordinates(self, enabled):
         self.coordinates_enabled = enabled
         self.hover_dot.setVisible(enabled)
@@ -220,7 +237,8 @@ class Canvas(pg.PlotWidget):
         if not self.coordinates_enabled:
             return
         position = event[0]
-        if not self.sceneBoundingRect().contains(position):
+        if not self.viewbox.sceneBoundingRect().contains(position):
+            self.hover_dot.setData([], [])
             return
         point = self.viewbox.mapSceneToView(position)
         x, y = point.x(), point.y()
