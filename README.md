@@ -1,10 +1,10 @@
-# MathLab 1.1
+# MathLab 1.1.4
 
 An offline Ukrainian mathematics laboratory for high school students, evolved
 incrementally from GraphMath in the existing **FoRe1n/MathGraph** repository.
 Choose a function, move its coefficients, and see both the curve and an explanation.
 
-![MathLab quadratic laboratory](docs/screenshots/mathlab/quadratic-light.png)
+![MathLab quadratic laboratory on Windows](docs/screenshots/mathlab-1.1.4-windows/startup.png)
 
 ## MathLab 1.1 changes
 
@@ -24,19 +24,31 @@ Coordinate ranges and point inspection live in the collapsed **Діапазон 
 panel. Changing coefficients preserves zoom and pan. Existing multiple-function
 editing, analysis, colors, visibility, history, themes and exports remain available.
 
-See [v1.1 validation and limitations](docs/mathlab-v1.1-validation.md).
-The native Windows workflow has built and published `MathLab-v1.1.0-Windows-x64.zip`.
-The v1.0 download below remains available alongside v1.1.
+The v1.1.4 stabilization pass corrects mathematical domains and explanations,
+discontinuities, parameter precision/undo, damaged-file handling, atomic exports
+and Windows font rendering. All twenty templates and version-1 projects remain.
+See the [final audit, measurements and limitations](docs/mathlab-v1.1.4-audit.md).
 
 ## Windows distribution
 
-**[Download MathLab v1.1.0 for Windows x64 (ZIP)](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.0/MathLab-v1.1.0-Windows-x64.zip)**
-([release and checksums](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.0)).
+**[Download MathLab v1.1.4 for Windows x64 (ZIP)](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.4/MathLab-v1.1.4-Windows-x64.zip)**
+([release, checksums and validation evidence](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.4)).
 Extract the entire folder and double-click **MathLab.exe**. Python is not required.
-[Native Windows release CI](https://github.com/FoRe1n/MathGraph/actions/runs/40106809725)
-passed tests, benchmarks, source/frozen smoke and archive verification. The public
-ZIP was downloaded independently: SHA256, all 1,506 member CRCs, bundled runtime
-and Windows AMD64 executable header were verified.
+[Native Windows release CI](https://github.com/FoRe1n/MathGraph/actions/runs/40204393173)
+passed **476 tests**, benchmarks, 61 real Qt captures, source/frozen smoke and
+archive verification. The frozen application ran outside the checkout with
+Python removed from PATH. The public ZIP was independently downloaded: SHA256,
+all 1,540 member CRCs, bundled runtime/fonts and Windows AMD64 executable were
+verified. Actual Windows screenshots were inspected for readable Ukrainian text.
+
+SHA256: `e7812c63006be5d002c5e10418050d464dd1fc634c4a489ad709380dd97a0a6f`.
+These checks used Windows Server 2022 offscreen; physical Windows 11 DPI,
+compositor behavior and hardware FPS remain unverified. Builds are unsigned.
+
+The [v1.1.0 release](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.0)
+is preserved. Intermediate stabilization releases v1.1.1–v1.1.3 are superseded
+after independent visual and parameter-locale checks exposed further defects;
+use v1.1.4 for testing.
 
 ### Preserved MathLab 1.0 release
 
@@ -102,8 +114,9 @@ python -m venv .venv
 Tests: `python -m pytest -q`. Source/frozen smoke mode:
 `python -m graphmath --smoke-test --smoke-output artifacts/smoke`.
 It checks all laboratories, the preserved analysis worker, project I/O and exports.
-Real Qt screenshots: `python scripts/capture_mathlab_qa.py`.
-Reproducible interaction measurements: `python scripts/benchmark_interaction.py`.
+Real Qt screenshots: `python scripts/capture_stabilization_qa.py`.
+Reproducible interaction measurements: `python scripts/benchmark_interaction.py`
+and `python scripts/benchmark_stabilization.py`.
 Headless Linux selects `QT_QPA_PLATFORM=offscreen`; an interactive desktop needs a
 display and the usual Qt system libraries. PyInstaller's `GraphMath.spec` filename
 is retained; its default distribution is now `MathLab`.
@@ -112,6 +125,7 @@ is retained; its default distribution is now `MathLab`.
 - [Architecture and engine API](docs/engine.md)
 - [MathLab validation and changed files](docs/mathlab-validation.md)
 - [Performance measurements](docs/mathlab-performance.md)
+- [Final v1.1.4 stabilization audit](docs/mathlab-v1.1.4-audit.md)
 - [Windows build and release](docs/windows-build.md)
 - [Original GraphMath validation](docs/validation.md)
 

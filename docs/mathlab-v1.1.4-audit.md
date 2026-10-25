@@ -17,7 +17,8 @@ The first published stabilization build, v1.1.1, passed 453 Windows tests and
 source/frozen smoke. Its public validation screenshots then revealed a critical
 coverage gap: ordinary Qt text was missing-glyph boxes while Matplotlib formulas
 were readable. It was not accepted as the final validated deliverable. The
-published version and assets were preserved; the correction uses v1.1.2.
+published version and assets were preserved; the font correction was first
+included in v1.1.2.
 
 The existing Matplotlib DejaVu regular/bold/italic fonts are now registered with
 Qt before graphics creation. The UI chooses a verified family, and axes use the
@@ -128,7 +129,8 @@ analysis, saves and exports remain. No existing test was removed or weakened.
 **Final Linux suite: 476 passed, zero failed, zero errors, zero skipped.**
 The final source smoke result reports version 1.1.4 and all twenty laboratory
 modes. Both commands executed and completed successfully. The final Windows
-release evidence is recorded below once its tagged checks finish.
+suite also passed all 476 tests, with zero failures, errors or skipped tests;
+independently downloaded release evidence is recorded below.
 
 ## Real visual review
 
@@ -220,7 +222,8 @@ ordinary odd-root derivatives report a limitation. Floating-point and Qt decimal
 precision limit extreme subnormal parameter editing; ordinary fine steps down to
 1e-8 were explicitly regression tested. Hardware Windows 11, monitor DPI,
 compositor FPS and code signing are not established by offscreen CI. Builds remain
-unsigned. No known critical defect remains in the exercised school workflow.
+unsigned. No unresolved reproducible correctness or data-loss defect was found
+in the exercised school workflow; observed latency spikes remain documented below.
 
 ## Final v1.1.4 performance recheck
 
@@ -264,11 +267,59 @@ Final records:
 
 ## Windows release validation
 
-The font-fixed [Windows pilot](https://github.com/FoRe1n/MathGraph/actions/runs/40198991232)
-passed packaged glyph checks; its public images were independently downloaded
-and visually inspected as readable. The final tagged v1.1.4 run must additionally
-pass all 476 tests, locale cases, source/frozen glyph smoke and all screenshots.
-Its frozen EXE runs outside the source checkout with Python removed from PATH and
-PYTHONPATH/PYTHONHOME cleared, verifying the bundled runtime and resources.
-Final tagged/public-asset evidence is recorded here only after checks succeed.
-Windows 11 hardware/monitor/compositor testing remains a manual task.
+The final [tagged Windows run](https://github.com/FoRe1n/MathGraph/actions/runs/40204393173)
+completed successfully on Windows Server 2022 x64, Python 3.12.10. Every build and
+release step reports success. This is native Windows verification, distinct from
+the local Linux results. It includes:
+
+- **476 tests passed, zero failures, errors or skips**, independently read from the
+  published JUnit XML, including locale and glyph regressions.
+- Both source and frozen smoke passed all twenty templates, analysis subprocess,
+  project roundtrip, PNG/SVG/PDF export and actual UI glyph coverage.
+- The frozen `MathLab.exe` ran outside the source checkout, with only Windows
+  directories on PATH and PYTHONPATH/PYTHONHOME cleared. It used the bundled
+  runtime/resources rather than a source import or external Python installation.
+- All 61 actual Qt screenshots passed control-text glyph checks. The 138-character
+  probe at 13/16/20px had zero missing glyphs. Independently downloaded startup,
+  custom, narrow 150% dark and expanded-settings Windows images were visually
+  inspected: Ukrainian text and the Add Function plus are readable.
+- PyInstaller, packaged-resource verification, ZIP validation and release
+  publication all completed without suppressed packaging errors.
+
+The final release is [MathLab v1.1.4](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.4),
+built from source `688888e1587711f9d3420f29556b507aeae19671`.
+The public [portable Windows ZIP](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.4/MathLab-v1.1.4-Windows-x64.zip)
+was downloaded independently after publication. Its size is **93,803,066 bytes**;
+SHA256 is `e7812c63006be5d002c5e10418050d464dd1fc634c4a489ad709380dd97a0a6f`.
+All **1,540 entries** passed CRC and safe-path checks; required Qt, Python and
+Matplotlib/font resources and the AMD64 PE executable were verified.
+The [published validation ZIP](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.4/MathLab-v1.1.4-validation.zip)
+was also downloaded and CRC-checked. Its test XML, smoke JSON, benchmark records,
+screenshot manifest and font reports were validated independently.
+
+| Final native Windows offscreen workload | Median ms | p95 ms | Maximum ms |
+| --- | ---: | ---: | ---: |
+| Five-function pan + forced raster (30 actions) | 19.131 | 19.608 | 19.669 |
+| Five-function wheel + raster (30 actions) | 18.779 | 19.609 | 21.137 |
+| Learning slider (30 actions) | 4.564 | 7.542 | 8.515 |
+| Existing-template switch (20 actions) | 34.225 | 49.069 | 49.069 |
+| Qt drag gesture (20 actions) | 19.651 | 21.184 | 21.184 |
+| Theme change (20 actions) | 84.817 | 96.170 | 96.170 |
+
+These Windows measurements have no same-runner original-version baseline and
+are not desktop FPS. The 400-step native session retained one curve and one cache
+entry with 24,576 bytes RSS growth. Extended workloads reported no callback
+errors. Full records and verification summary:
+
+- [Public asset and native validation summary](performance/mathlab-v1.1.4-public-verification.json)
+- [Native interaction benchmark](performance/mathlab-v1.1.4-windows-interaction.json)
+- [Native extended workloads](performance/mathlab-v1.1.4-windows-stabilization.json)
+
+![Final native Windows startup](screenshots/mathlab-1.1.4-windows/startup.png)
+![Final native Windows custom editor](screenshots/mathlab-1.1.4-windows/custom-light.png)
+![Final native Windows narrow dark at 150%](screenshots/mathlab-1.1.4-windows/narrow-150-dark.png)
+![Final native Windows settings](screenshots/mathlab-1.1.4-windows/settings-advanced-dark.png)
+
+Windows 11 hardware/monitor/compositor testing remains a manual task. Anonymous
+GitHub access exposed step conclusions and published evidence but not full raw
+runner logs. No 60 FPS, physical Windows 11 or code-signing claim is made.

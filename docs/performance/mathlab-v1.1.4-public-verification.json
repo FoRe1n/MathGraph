@@ -1,0 +1,109 @@
+{
+  "sha256": "e7812c63006be5d002c5e10418050d464dd1fc634c4a489ad709380dd97a0a6f",
+  "members": 1540,
+  "windows_amd64": true,
+  "zip_bytes": 93803066,
+  "windows_tests": {
+    "tests": 476,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "source-smoke": {
+    "status": "passed",
+    "version": "1.1.4",
+    "exports": [
+      "png",
+      "svg",
+      "pdf"
+    ],
+    "project_roundtrip": true,
+    "analysis_subprocess": true,
+    "laboratory_modes": [
+      "quadratic",
+      "exponential",
+      "logarithmic",
+      "linear",
+      "direct",
+      "constant",
+      "vertical",
+      "inverse",
+      "square",
+      "vertex",
+      "cubic",
+      "absolute",
+      "sqrt",
+      "sqrt_left",
+      "sqrt_down",
+      "exponential_shift",
+      "logarithmic_scale",
+      "sin",
+      "cos",
+      "tan"
+    ],
+    "application": "MathLab",
+    "ui_font": "DejaVu Sans",
+    "ui_glyph_coverage": true
+  },
+  "frozen-smoke": {
+    "status": "passed",
+    "version": "1.1.4",
+    "exports": [
+      "png",
+      "svg",
+      "pdf"
+    ],
+    "project_roundtrip": true,
+    "analysis_subprocess": true,
+    "laboratory_modes": [
+      "quadratic",
+      "exponential",
+      "logarithmic",
+      "linear",
+      "direct",
+      "constant",
+      "vertical",
+      "inverse",
+      "square",
+      "vertex",
+      "cubic",
+      "absolute",
+      "sqrt",
+      "sqrt_left",
+      "sqrt_down",
+      "exponential_shift",
+      "logarithmic_scale",
+      "sin",
+      "cos",
+      "tan"
+    ],
+    "application": "MathLab",
+    "ui_font": "DejaVu Sans",
+    "ui_glyph_coverage": true
+  },
+  "windows_screenshots": 61,
+  "windows_font_coverage": {
+    "DejaVu Sans,-1,13,5,400,0,0,0,0,0,0,0,0,0,0,1": {
+      "family": "DejaVu Sans",
+      "probe_characters": 138,
+      "missing_glyphs": 0
+    },
+    "DejaVu Sans,-1,16,5,400,0,0,0,0,0,0,0,0,0,0,1": {
+      "family": "DejaVu Sans",
+      "probe_characters": 138,
+      "missing_glyphs": 0
+    },
+    "DejaVu Sans,-1,20,5,400,0,0,0,0,0,0,0,0,0,0,1": {
+      "family": "DejaVu Sans",
+      "probe_characters": 138,
+      "missing_glyphs": 0
+    }
+  },
+  "status": "passed",
+  "source_commit": "688888e1587711f9d3420f29556b507aeae19671",
+  "tag": "mathlab-v1.1.4",
+  "workflow_url": "https://github.com/FoRe1n/MathGraph/actions/runs/40204393173",
+  "frozen_outside_checkout_without_python_path": true,
+  "actual_control_glyph_checks_passed": true,
+  "validation_zip_crc_checked": true
+}
