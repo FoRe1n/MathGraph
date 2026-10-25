@@ -149,3 +149,49 @@ def test_close_stops_owned_debounce_timers(window):
     window.confirm_discard=lambda:True
     assert window.close()
     assert not any(timer.isActive() for timer in window.findChildren(QTimer))
+
+
+
+@pytest.mark.parametrize('locale_name',['C','uk_UA'])
+@pytest.mark.parametrize('value',[1.2e-8,-2.5e-7,1234567.00000001])
+def test_scientific_parameter_text_roundtrips_in_its_locale(qtbot,locale_name,value):
+    from PySide6.QtCore import QLocale
+    from PySide6.QtGui import QValidator
+    step=1e-10 if abs(value)<1 else 1e-8
+    parameter=Parameter(value=value,minimum=value-step*100,maximum=value+step*100,step=step,initial=value)
+    control=ParameterControl('a',parameter);control.setLocale(QLocale(locale_name));qtbot.addWidget(control)
+    text=control.value.text()
+    assert control.value.validate(text,len(text))[0]==QValidator.Acceptable
+    assert control.value.valueFromText(text)==value
+    control.value.interpretText()
+    assert control.value.value()==value and parameter.value==value
+
+
+
+@pytest.mark.parametrize('locale_name',['C','uk_UA'])
+def test_new_high_precision_normal_value_roundtrips_without_loss(qtbot,locale_name):
+    from PySide6.QtCore import QLocale
+    parameter=Parameter();control=ParameterControl('a',parameter)
+    control.setLocale(QLocale(locale_name));qtbot.addWidget(control)
+    value=1.2345678901234567;control.value.setValue(value)
+    assert control.value.valueFromText(control.value.text())==value
+    control.value.interpretText()
+    assert control.value.value()==value and parameter.value==value
+
+
+def test_slider_ticks_do_not_display_binary_rounding_tails(qtbot):
+    parameter=Parameter();control=ParameterControl('a',parameter);qtbot.addWidget(control)
+    control.slider.setValue(53)
+    assert parameter.value==.3
+    assert control.value.valueFromText(control.value.text())==.3
+    assert len(control.value.text())<12
+
+
+
+def test_unrepresentable_qt_subnormal_is_retained_and_not_silently_editable(qtbot):
+    value=5e-324;parameter=Parameter(value=value,minimum=0,maximum=1e-320,step=value,initial=value)
+    control=ParameterControl('a',parameter);qtbot.addWidget(control)
+    assert parameter.value==value
+    assert control.value.isReadOnly() and not control.slider.isEnabled()
+    assert 'збережено' in control.value.toolTip()
+    assert control.value.locale().toDouble(control.value.text())[0]==value

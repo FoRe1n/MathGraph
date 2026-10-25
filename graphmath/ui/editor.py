@@ -1,6 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QLocale
 from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLineEdit, QToolButton,
                                QLabel, QMenu, QColorDialog, QWidget, QSlider, QDoubleSpinBox,
                                QPushButton, QDialog, QFormLayout, QDialogButtonBox, QAbstractSpinBox)
@@ -128,9 +128,22 @@ def parameter_precision(parameter):
 
 
 class ParameterValueBox(QDoubleSpinBox):
+    def setDecimals(self,decimals):
+        # Qt scientific validation needs extra headroom in narrow ranges. Keep
+        # room for a complete double string without widening ordinary display.
+        self.display_decimals=decimals
+        super().setDecimals(max(32,decimals))
+
     def textFromValue(self,value):
-        if value and (abs(value)<1e-4 or abs(value)>=1e6):return f'{value:.12g}'
-        return super().textFromValue(value)
+        if hasattr(self,'uneditable_value'):
+            return self.locale().toString(self.uneditable_value,'e',QLocale.FloatingPointShortest)
+        locale=QLocale(self.locale())
+        if not self.isGroupSeparatorShown():
+            locale.setNumberOptions(locale.numberOptions()|QLocale.OmitGroupSeparator)
+        if value and (abs(value)<1e-4 or abs(value)>=1e6):
+            return locale.toString(value,'e',QLocale.FloatingPointShortest)
+        digits=max(getattr(self,'display_decimals',self.decimals()),max(0,-Decimal(str(value)).as_tuple().exponent))
+        return locale.toString(value,'f',digits)
 
 
 class ParameterControl(QWidget):
@@ -171,9 +184,19 @@ class ParameterControl(QWidget):
         outer.addWidget(self.slider)
         self.slider.valueChanged.connect(self.slide)
         self.value.valueChanged.connect(self.spin)
+        if self.value.value()!=parameter.value:
+            # Qt cannot store the least subnormal doubles at its decimal cap.
+            # Keep project data intact and make the editing limit explicit.
+            message='Значення замале для редагування в цьому полі. Його збережено без змін.'
+            self.value.uneditable_value=parameter.value
+            self.value.setReadOnly(True)
+            self.value.lineEdit().setText(self.value.locale().toString(parameter.value,'e',QLocale.FloatingPointShortest))
+            for widget in (self.value,self.slider,reset,settings):widget.setToolTip(message)
+            self.slider.setEnabled(False);reset.setEnabled(False);settings.setEnabled(False)
 
     def slide(self, tick):
-        self.value.setValue(min(self.parameter.maximum, self.parameter.minimum + tick * self.parameter.step))
+        value=float(Decimal(str(self.parameter.minimum))+tick*Decimal(str(self.parameter.step)))
+        self.value.setValue(min(self.parameter.maximum,max(self.parameter.minimum,value)))
 
     def spin(self, value):
         self.slider.blockSignals(True)

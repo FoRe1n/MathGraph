@@ -311,7 +311,7 @@ class MainWindow(QMainWindow):
         view.addAction(self.actions["settings"])
         help_menu = self.menuBar().addMenu("Довідка")
         help_menu.addAction("Синтаксис і керування", self.help)
-        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.2\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
+        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.3\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
 
     def create_toolbar(self):
         toolbar=QToolBar('Основні дії',self)
