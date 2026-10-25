@@ -1,5 +1,9 @@
 # MathLab 1.1.3 stabilization audit
 
+**Superseded by the [final v1.1.4 audit](mathlab-v1.1.4-audit.md).**
+The remaining full-width decorative plus was replaced and actual control-text
+glyph checks were added; mathematical and parameter fixes remain unchanged.
+
 Scope: fixes, performance and verification of the existing twenty templates and
 custom workspace. No new mathematical categories, major interface components,
 project format or dependencies were added. Development branch:

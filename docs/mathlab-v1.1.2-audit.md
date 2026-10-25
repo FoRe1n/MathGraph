@@ -1,6 +1,6 @@
 # MathLab 1.1.2 stabilization audit
 
-**Superseded by the [v1.1.3 audit](mathlab-v1.1.3-audit.md).**
+**Superseded by the [v1.1.4 audit](mathlab-v1.1.4-audit.md).**
 Windows font rendering was corrected, but the final parameter locale review
 required another correction before the validated deliverable.
 

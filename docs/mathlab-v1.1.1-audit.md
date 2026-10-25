@@ -2,7 +2,7 @@
 
 **Superseded after Windows screenshot inspection found missing UI glyphs.**
 The 453 automated Windows checks passed, but this build was not accepted as the
-final validated deliverable. See the [v1.1.3 audit](mathlab-v1.1.3-audit.md) for
+final validated deliverable. See the [v1.1.4 audit](mathlab-v1.1.4-audit.md) for
 the font correction, additional regressions and final release verification.
 
 Scope: fixes, performance and verification of the existing twenty templates and

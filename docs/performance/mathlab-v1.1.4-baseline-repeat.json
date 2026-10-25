@@ -1,0 +1,125 @@
+{
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+  "python": "3.12.14",
+  "qt_backend": "offscreen",
+  "frames_per_scenario": 60,
+  "startup_imports_window_first_event_ms": 1726.591,
+  "window_creation_first_event_ms": 548.774,
+  "scenarios": {
+    "quadratic": {
+      "numerical_batch": {
+        "median_ms": 0.196,
+        "p95_ms": 0.691,
+        "max_ms": 1.091
+      },
+      "idle_forced_raster_paint": {
+        "median_ms": 5.253,
+        "p95_ms": 16.414,
+        "max_ms": 21.845
+      },
+      "pan_event_and_forced_raster": {
+        "median_ms": 10.66,
+        "p95_ms": 21.699,
+        "max_ms": 23.008
+      },
+      "wheel_event_and_forced_raster": {
+        "median_ms": 9.277,
+        "p95_ms": 16.674,
+        "max_ms": 86.938
+      },
+      "pan_cpu_percent_one_core": 102.6,
+      "pan_sampling_calls": 0
+    },
+    "exponential": {
+      "numerical_batch": {
+        "median_ms": 0.24,
+        "p95_ms": 0.606,
+        "max_ms": 1.029
+      },
+      "idle_forced_raster_paint": {
+        "median_ms": 5.257,
+        "p95_ms": 7.882,
+        "max_ms": 10.278
+      },
+      "pan_event_and_forced_raster": {
+        "median_ms": 9.139,
+        "p95_ms": 15.102,
+        "max_ms": 27.649
+      },
+      "wheel_event_and_forced_raster": {
+        "median_ms": 8.781,
+        "p95_ms": 12.787,
+        "max_ms": 14.446
+      },
+      "pan_cpu_percent_one_core": 103.0,
+      "pan_sampling_calls": 0
+    },
+    "logarithmic": {
+      "numerical_batch": {
+        "median_ms": 0.258,
+        "p95_ms": 0.982,
+        "max_ms": 2.588
+      },
+      "idle_forced_raster_paint": {
+        "median_ms": 3.427,
+        "p95_ms": 5.733,
+        "max_ms": 6.943
+      },
+      "pan_event_and_forced_raster": {
+        "median_ms": 8.706,
+        "p95_ms": 16.065,
+        "max_ms": 18.827
+      },
+      "wheel_event_and_forced_raster": {
+        "median_ms": 8.519,
+        "p95_ms": 13.088,
+        "max_ms": 18.209
+      },
+      "pan_cpu_percent_one_core": 102.8,
+      "pan_sampling_calls": 0
+    },
+    "five_functions": {
+      "numerical_batch": {
+        "median_ms": 0.927,
+        "p95_ms": 2.024,
+        "max_ms": 3.178
+      },
+      "idle_forced_raster_paint": {
+        "median_ms": 19.014,
+        "p95_ms": 31.389,
+        "max_ms": 153.054
+      },
+      "pan_event_and_forced_raster": {
+        "median_ms": 16.322,
+        "p95_ms": 29.35,
+        "max_ms": 70.174
+      },
+      "wheel_event_and_forced_raster": {
+        "median_ms": 15.723,
+        "p95_ms": 23.849,
+        "max_ms": 27.801
+      },
+      "pan_cpu_percent_one_core": 101.6,
+      "pan_sampling_calls": 0
+    }
+  },
+  "custom_parameter_response": {
+    "median_ms": 2.792,
+    "p95_ms": 5.656,
+    "max_ms": 7.962
+  },
+  "learning_slider_response": {
+    "median_ms": 3.483,
+    "p95_ms": 6.277,
+    "max_ms": 7.687
+  },
+  "extended_interaction": {
+    "steps": 400,
+    "seconds": 2.467,
+    "rss_before_bytes": 205950976,
+    "rss_after_bytes": 205950976,
+    "rss_delta_bytes": 0,
+    "curve_objects": 1,
+    "sample_cache_entries": 1
+  }
+}
