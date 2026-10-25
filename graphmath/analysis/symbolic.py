@@ -1,6 +1,8 @@
 """Exact symbolic analysis. Call in a time-limited process for untrusted input."""
 from __future__ import annotations
 import math
+import logging
+import re
 import sympy as sp
 from sympy.calculus.util import continuous_domain, function_range
 from graphmath.core.expressions import parse, X, ExpressionError
@@ -19,7 +21,10 @@ def _safe(call):
 
 
 def _text(value):
-    return UNKNOWN if value is None else sp.sstr(sp.simplify(value)).replace("oo", "∞").replace("EmptySet", "∅").replace("Reals", "ℝ")
+    if value is None:
+        return UNKNOWN
+    text = sp.sstr(sp.simplify(value))
+    return re.sub(r'\boo\b', '∞', text).replace("EmptySet", "∅").replace("Reals", "ℝ")
 
 
 def _finite_points(values, expr, domain):
@@ -31,6 +36,47 @@ def _finite_points(values, expr, domain):
                 if y.is_finite and y.is_real:
                     result.append({"x": float(x), "y": float(y), "exact": f"({_text(x)}, {_text(y)})"})
     return result
+
+
+def _real_domain(parsed, substitutions):
+    """Apply every original guard even after a zero parameter cancels a term."""
+    expr = parsed.symbolic.subs(substitutions)
+    domain = _safe(lambda: continuous_domain(expr, X, sp.S.Reals))
+    if domain is None:
+        return None
+    for denominator in parsed.denominators:
+        roots = _safe(lambda d=denominator: sp.solveset(d.subs(substitutions), X, domain=sp.S.Reals))
+        if roots is None:
+            return None
+        domain = domain - roots
+    for items, relation in [(parsed.nonnegative, lambda a: a >= 0), (parsed.positive, lambda a: a > 0)]:
+        for guard in items:
+            allowed = _safe(lambda g=guard: sp.solve_univariate_inequality(relation(g.subs(substitutions)), X, relational=False))
+            if allowed is None:
+                return None
+            domain = domain.intersect(allowed)
+    return domain
+
+
+def _monotonic_set(derivative, increasing, domain):
+    condition = derivative > 0 if increasing else derivative < 0
+    solution = _safe(lambda: sp.solve_univariate_inequality(condition, X, relational=False))
+    if solution is None:
+        return None
+    if derivative.has(sp.sin, sp.cos, sp.tan) and solution not in (sp.S.Reals, sp.S.EmptySet) and not solution.has(sp.ImageSet):
+        # SymPy returns representative intervals from one period for many trig
+        # inequalities. They are not the complete real solution; do not present
+        # them as the global monotonicity set.
+        return None
+    return solution.intersect(domain)
+
+
+def _visible_text(text):
+    replacements = {'Reals': 'ℝ', 'Integers': 'ℤ', 'EmptySet': '∅',
+                    'Intersection': 'Перетин', 'Union': 'Об’єднання',
+                    'Complement': 'Різниця множин', 'ImageSet': 'Образ множини',
+                    'ConditionSet': 'Множина за умовою', 'otherwise': 'інакше'}
+    return re.sub(r'\b('+ '|'.join(replacements) +r')\b', lambda match: replacements[match.group()], text)
 
 
 def analyze(source: str, parameters: dict[str, float] | None = None,
@@ -45,24 +91,14 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
         raise ExpressionError("Вертикальна пряма — відношення, а не функція y = f(x).")
     subs = {sp.Symbol(n, real=True): sp.Rational(str((parameters or {}).get(n, 1))) for n in parsed.parameters}
     expr = parsed.symbolic.subs(subs)
-    domain = _safe(lambda: continuous_domain(expr, X, sp.S.Reals))
-    if domain is not None:
-        for denominator in parsed.denominators:
-            roots = _safe(lambda d=denominator: sp.solveset(d.subs(subs), X, domain=sp.S.Reals))
-            if roots is None:
-                domain = None
-                break
-            domain = domain - roots
-        for items, relation in [(parsed.nonnegative, lambda a: a >= 0), (parsed.positive, lambda a: a > 0)]:
-            for guard in items:
-                allowed = _safe(lambda g=guard: sp.solve_univariate_inequality(relation(g.subs(subs)), X, relational=False))
-                if allowed is None:
-                    domain = None
-                    break
-                domain = domain.intersect(allowed) if domain is not None else None
+    domain = _real_domain(parsed, subs)
     real_domain = domain if domain is not None else sp.S.Reals
     zeros = _safe(lambda: sp.solveset(expr, X, domain=real_domain)) if domain is not None else None
     derivative = _safe(lambda: sp.diff(expr, X))
+    if derivative is not None and derivative.has(sp.DiracDelta):
+        # Distributional artifacts from sign/absolute real-root representations
+        # are not an ordinary school derivative. Report the solver limitation.
+        derivative = None
     # Range must respect holes and disconnected components. Ask SymPy directly.
     value_range = _safe(lambda: function_range(expr, X, domain)) if domain is not None else None
     intercept = None
@@ -90,8 +126,8 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
                     kind = "мінімум" if left.is_negative and right.is_positive else "максимум" if left.is_positive and right.is_negative else None
                     if kind:
                         extrema.extend([{**p, "kind": kind} for p in _finite_points(sp.FiniteSet(point), expr, real_domain)])
-    increasing = _safe(lambda: sp.solve_univariate_inequality(derivative > 0, X, relational=False).intersect(real_domain)) if derivative is not None and domain is not None else None
-    decreasing = _safe(lambda: sp.solve_univariate_inequality(derivative < 0, X, relational=False).intersect(real_domain)) if derivative is not None and domain is not None else None
+    increasing = _monotonic_set(derivative, True, real_domain) if derivative is not None and domain is not None else None
+    decreasing = _monotonic_set(derivative, False, real_domain) if derivative is not None and domain is not None else None
     vertical, horizontal = [], []
     # Boundary candidates plus denominator roots; nonfinite sets are reported as unknown.
     candidates = _safe(lambda: domain.boundary) if domain is not None else None
@@ -110,7 +146,7 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
         if endpoint != infinity:
             continue
         limit = _safe(lambda inf=infinity: sp.limit(expr, X, inf))
-        if limit is not None and limit.is_real and limit.is_finite:
+        if limit is not None and limit.is_number and limit.is_real and limit.is_finite:
             if not any(p["exact"] == _text(limit) for p in horizontal):
                 horizontal.append({"value": float(limit), "exact": _text(limit)})
     intersections = []
@@ -119,17 +155,16 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
         second_parsed = parse(other)
         if second_parsed.relation:
             raise ExpressionError("Для перетинів оберіть дві функції y = f(x).")
-        other_values = {n: (other_parameters or {}).get(n, 1) for n in second_parsed.parameters}
-        second = second_parsed.substitute(other_values)
-        second_domain = _safe(lambda: continuous_domain(second, X, sp.S.Reals))
+        other_values = {sp.Symbol(n, real=True): sp.Rational(str((other_parameters or {}).get(n, 1))) for n in second_parsed.parameters}
+        second = second_parsed.symbolic.subs(other_values)
+        second_domain = _real_domain(second_parsed, other_values)
         if second_domain is not None and domain is not None:
-            for d in second_parsed.denominators:
-                roots = _safe(lambda d=d: sp.solveset(d.subs({sp.Symbol(k, real=True): v for k, v in other_values.items()}), X, domain=sp.S.Reals))
-                if roots is not None:
-                    second_domain = second_domain - roots
-            roots = _safe(lambda: sp.solveset(expr - second, X, domain=domain.intersect(second_domain)))
-            intersections = _finite_points(roots, expr, domain.intersect(second_domain))
+            common_domain = domain.intersect(second_domain)
+            roots = _safe(lambda: sp.solveset(expr - second, X, domain=common_domain))
+            intersections = _finite_points(roots, expr, common_domain)
             intersection_text = _text(roots)
+        else:
+            intersection_text = UNKNOWN
     result = {
         "properties": {
             "Область визначення": _text(domain), "Область значень": _text(value_range),
@@ -150,15 +185,25 @@ def analyze(source: str, parameters: dict[str, float] | None = None,
                         ('Нулі / перетини Ox',zeros),('Перетин Oy',intercept),
                         ('Похідна',derivative),('Зростає',increasing),('Спадає',decreasing)]:
         display[label]=UNKNOWN if value is None else sp.pretty(sp.simplify(value),use_unicode=True,wrap_line=False)
-    result['display_properties']=display
+    result['display_properties']={label:_visible_text(text) for label,text in display.items()}
     return result
 
 
 def worker(connection, source, parameters, other, other_parameters):
     """Process entry point; no GUI imports, supports Windows spawn/frozen builds."""
+    def send(payload):
+        try:
+            connection.send(payload)
+        except (BrokenPipeError, EOFError, OSError):
+            # Closing a window can close its pipe while the worker completes.
+            # There is no consumer left; do not retry the same closed channel.
+            logging.getLogger(__name__).debug("Analysis consumer closed", exc_info=True)
     try:
-        connection.send({"result": analyze(source, parameters, other, other_parameters)})
-    except Exception:
-        connection.send({"error": UNKNOWN})
+        try:
+            payload = {"result": analyze(source, parameters, other, other_parameters)}
+        except Exception:
+            logging.getLogger(__name__).exception("Symbolic analysis failed")
+            payload = {"error": UNKNOWN}
+        send(payload)
     finally:
         connection.close()
