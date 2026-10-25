@@ -1,4 +1,5 @@
 from __future__ import annotations
+from decimal import Decimal
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLineEdit, QToolButton,
                                QLabel, QMenu, QColorDialog, QWidget, QSlider, QDoubleSpinBox,
@@ -30,20 +31,24 @@ class FunctionRow(QFrame):
         self.color.setText("●")
         self.color.setStyleSheet(f"color: {function.color}; font-size: 19px;")
         self.color.setToolTip("Колір функції")
+        self.color.setAccessibleName(f"Змінити колір функції {index+1}")
         self.color.clicked.connect(self.choose_color)
         self.eye = QToolButton()
         self.eye.setText("✓")
         self.eye.setCheckable(True)
         self.eye.setChecked(function.visible)
         self.eye.setToolTip("Показати / приховати функцію")
+        self.eye.setAccessibleName(f"Показати або приховати функцію {index+1}")
         self.eye.toggled.connect(lambda state: self.visibility.emit(function.id, state))
         label = QLabel("Відношення x = c" if function.expression.strip().startswith("x=") else f"f{index + 1}(x)")
         self.kind_label=label
         self.function_index=index
         label.setObjectName("muted")
         more = QToolButton()
+        self.more=more
         more.setText("⋯")
         more.setToolTip("Дії з функцією")
+        more.setAccessibleName(f"Дії з функцією {index+1}")
         menu = QMenu(more)
         menu.addAction("Дублювати", lambda: self.duplicated.emit(function.id))
         menu.addAction("Видалити", lambda: self.removed.emit(function.id))
@@ -86,6 +91,7 @@ class FunctionRow(QFrame):
         super().mousePressEvent(event)
 
     def set_selected(self, selected):
+        if self.property("selected")==selected:return
         self.setProperty("selected", selected)
         self.style().unpolish(self)
         self.style().polish(self)
@@ -117,6 +123,16 @@ class FunctionRow(QFrame):
             self.changed.emit(self.function.id, self.input.text())
 
 
+def parameter_precision(parameter):
+    return max(5,min(323,max(-Decimal(str(value)).as_tuple().exponent for value in vars(parameter).values())))
+
+
+class ParameterValueBox(QDoubleSpinBox):
+    def textFromValue(self,value):
+        if value and (abs(value)<1e-4 or abs(value)>=1e6):return f'{value:.12g}'
+        return super().textFromValue(value)
+
+
 class ParameterControl(QWidget):
     changed = Signal(str, object)
 
@@ -127,9 +143,9 @@ class ParameterControl(QWidget):
         outer.setContentsMargins(0, 4, 0, 8)
         top = QHBoxLayout()
         top.addWidget(QLabel(name))
-        self.value = QDoubleSpinBox()
+        self.value = ParameterValueBox()
         self.value.setButtonSymbols(QAbstractSpinBox.NoButtons)
-        self.value.setDecimals(5)
+        self.value.setDecimals(parameter_precision(parameter))
         self.value.setRange(parameter.minimum, parameter.maximum)
         self.value.setSingleStep(parameter.step)
         self.value.setValue(parameter.value)
@@ -172,9 +188,9 @@ class ParameterControl(QWidget):
         layout = QFormLayout(dialog)
         fields = {}
         for key, label in [("minimum", "Мінімум"), ("maximum", "Максимум"), ("step", "Крок")]:
-            box = QDoubleSpinBox()
-            box.setDecimals(5)
-            box.setRange(0.00001 if key == "step" else -1e6, 1e6)
+            box = ParameterValueBox()
+            box.setDecimals(parameter_precision(self.parameter))
+            box.setRange(min(0.00001,self.parameter.step) if key == "step" else -1e12, 1e12)
             box.setValue(getattr(self.parameter, key))
             fields[key] = box
             layout.addRow(label, box)
@@ -195,8 +211,12 @@ class ParameterControl(QWidget):
             dialog.accept()
         buttons.accepted.connect(accept)
         if dialog.exec():
-            self.changed.emit(self.name, self.parameter)
+            self.slider.blockSignals(True);self.value.blockSignals(True)
+            self.value.setDecimals(parameter_precision(self.parameter))
             self.slider.setRange(0, round((self.parameter.maximum - self.parameter.minimum) / self.parameter.step))
             self.value.setRange(self.parameter.minimum, self.parameter.maximum)
             self.value.setSingleStep(self.parameter.step)
             self.value.setValue(self.parameter.value)
+            self.slider.setValue(round((self.parameter.value-self.parameter.minimum)/self.parameter.step))
+            self.slider.blockSignals(False);self.value.blockSignals(False)
+            self.changed.emit(self.name,self.parameter)

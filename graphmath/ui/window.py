@@ -1,13 +1,16 @@
 from __future__ import annotations
 import copy
 import json
+import math
+import logging
+import re
 from pathlib import Path
 import numpy as np
 from PySide6.QtCore import Qt, QSettings, QSize, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QDockWidget, QScrollArea, QPushButton, QLabel, QToolBar, QToolButton, QFileDialog,
-    QMessageBox, QLineEdit, QAbstractSpinBox, QMenu, QDialog, QStackedWidget, QComboBox, QDoubleSpinBox, QGridLayout)
+    QMessageBox, QLineEdit, QAbstractSpinBox, QMenu, QDialog, QStackedWidget, QComboBox, QDoubleSpinBox, QGridLayout, QSizePolicy)
 from graphmath.core.expressions import parse, ExpressionError
 from graphmath.persistence.projects import Project, Function, Parameter, COLORS, from_dict, save, load
 from graphmath.plotting.export import export_graph
@@ -21,18 +24,33 @@ from graphmath.core.laboratories import LABS, GROUPS, default_project, identify,
 from graphmath.ui.learning import LearningPanel
 
 
+logger=logging.getLogger(__name__)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, settings: QSettings | None = None):
         super().__init__()
         self.settings = settings if settings is not None else QSettings("GraphMath", "GraphMath")
         defaults = {"theme": "light", "precision": 5, "scale": "100%", "colors": COLORS,
                     "default_view": [-6, 6, -3, 9], "grid": True, "axes": True, "coordinates": False}
+        self.preferences=copy.deepcopy(defaults)
         try:
-            self.preferences = {**defaults, **json.loads(self.settings.value("preferences", "{}"))}
-            if self.preferences["theme"] not in PALETTES:
-                self.preferences["theme"] = "light"
-        except (ValueError, TypeError):
-            self.preferences = defaults
+            saved=json.loads(self.settings.value('preferences','{}'))
+        except (ValueError,TypeError,RecursionError):
+            saved={}
+        if isinstance(saved,dict):
+            for key in ('grid','axes','coordinates'):
+                if type(saved.get(key)) is bool:self.preferences[key]=saved[key]
+            if isinstance(saved.get('theme'),str) and saved['theme'] in PALETTES:self.preferences['theme']=saved['theme']
+            if type(saved.get('precision')) is int and 2<=saved['precision']<=10:self.preferences['precision']=saved['precision']
+            if saved.get('scale') in ('100%','115%','130%','150%'):self.preferences['scale']=saved['scale']
+            colors=saved.get('colors')
+            if isinstance(colors,list) and 1<=len(colors)<=20 and all(isinstance(c,str) and re.fullmatch(r'#[0-9a-fA-F]{6}',c) for c in colors):
+                self.preferences['colors']=colors
+            view=saved.get('default_view')
+            if (isinstance(view,list) and len(view)==4 and all(type(v) in (int,float) and abs(v)<=1e8 and math.isfinite(v) for v in view)
+                and view[1]-view[0]>=1e-6 and view[3]-view[2]>=1e-6):
+                self.preferences['default_view']=view
         self.project = default_project()
         self.mode = "quadratic"
         self.project.view = list(self.preferences["default_view"])
@@ -46,6 +64,7 @@ class MainWindow(QMainWindow):
         self.loading = False
         self.dirty = False
         self.rows = {}
+        self.parameter_memory = {}
         self.actions = {}
         self.setWindowTitle("MathLab 1.1")
         self.resize(1400, 850)
@@ -55,13 +74,16 @@ class MainWindow(QMainWindow):
         graph_layout = QVBoxLayout(graph_area)
         graph_layout.setContentsMargins(0, 0, 0, 0)
         graph_header = QHBoxLayout()
-        self.graph_hint = QLabel('  x → праворуч    ·    y ↑ вгору')
+        self.graph_hint = QLabel('  x →  ·  y ↑')
         self.graph_hint.setObjectName('muted')
-        graph_header.addWidget(self.graph_hint)
-        graph_header.addStretch()
+        self.graph_hint.setWordWrap(False)
+        self.graph_hint.setToolTip("Додатний напрям x — праворуч; додатний напрям y — вгору.")
+        self.graph_hint.setMinimumWidth(0)
+        self.graph_hint.setSizePolicy(QSizePolicy.Ignored,QSizePolicy.Fixed)
+        graph_header.addWidget(self.graph_hint,1)
         for label, tooltip, callback in [('+', 'Збільшити', lambda:self.canvas.viewbox.scaleBy((.8,.8))),
                                           ('−', 'Зменшити', lambda:self.canvas.viewbox.scaleBy((1.25,1.25))),
-                                          ('Початковий вигляд', 'Повернути зручний масштаб для цієї функції', self.reset_view)]:
+                                          ('Скинути вигляд', 'Повернути зручний масштаб для цієї функції', self.reset_view)]:
             button=QPushButton(label);button.setToolTip(tooltip);button.clicked.connect(callback)
             graph_header.addWidget(button)
         graph_layout.addLayout(graph_header)
@@ -103,6 +125,8 @@ class MainWindow(QMainWindow):
         self.cursor_label = QLabel("x  0     y  0")
         self.scale_label = QLabel()
         self.active_label = QLabel()
+        self.active_label.setMaximumWidth(240)
+        self.active_label.setSizePolicy(QSizePolicy.Preferred,QSizePolicy.Preferred)
         self.statusBar().addWidget(self.cursor_label, 1)
         self.statusBar().addPermanentWidget(self.active_label)
         self.statusBar().addPermanentWidget(self.scale_label)
@@ -141,6 +165,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
+        self.scroll.setMinimumHeight(160)
         self.list_widget = QWidget()
         self.list_layout = QVBoxLayout(self.list_widget)
         self.list_layout.setContentsMargins(0, 0, 0, 0)
@@ -155,9 +180,9 @@ class MainWindow(QMainWindow):
         self.example_buttons={}
         for i,expression in enumerate(['x²','2x + 1','sqrt(x)','1/x','2^x','log(x,2)','sin(x)']):
             button=QPushButton(expression);button.clicked.connect(lambda checked=False,e=expression:self.use_example(e))
-            self.example_buttons[expression]=button;example_layout.addWidget(button,i//3,i%3)
+            self.example_buttons[expression]=button;example_layout.addWidget(button,i//4,i%4)
         layout.addWidget(examples)
-        variable_hint=QLabel('x — незалежна змінна: рухайтеся вздовж графіка. Для горизонтального зсуву використовуйте h у формулі x − h.')
+        variable_hint=QLabel('x — незалежна змінна. Додатне h у x − h зсуває графік праворуч.')
         variable_hint.setWordWrap(True);variable_hint.setObjectName('muted');variable_hint.setContentsMargins(12,0,12,4)
         layout.addWidget(variable_hint)
         layout.addWidget(self.scroll, 1)
@@ -193,7 +218,7 @@ class MainWindow(QMainWindow):
         self.parameter_layout.setContentsMargins(12, 6, 12, 6)
         self.parameter_scroll = QScrollArea()
         self.parameter_scroll.setWidgetResizable(True)
-        self.parameter_scroll.setMaximumHeight(250)
+        self.parameter_scroll.setMaximumHeight(210)
         self.parameter_scroll.setWidget(self.parameter_container)
         self.parameter_scroll.hide()
         layout.addWidget(self.parameter_scroll)
@@ -226,7 +251,8 @@ class MainWindow(QMainWindow):
         self.learning.visibility_requested.connect(lambda:self.visibility(self.project.selected,True))
         learning_scroll=QScrollArea();learning_scroll.setWidgetResizable(True)
         learning_scroll.setWidget(self.learning)
-        self.pages=QStackedWidget();self.pages.addWidget(learning_scroll);self.pages.addWidget(container)
+        custom_scroll=QScrollArea();custom_scroll.setWidgetResizable(True);custom_scroll.setWidget(container)
+        self.pages=QStackedWidget();self.pages.addWidget(learning_scroll);self.pages.addWidget(custom_scroll)
         outer.addWidget(self.pages,1)
         self.editor_dock.setWidget(sidebar)
         self.editor_dock.setTitleBarWidget(QWidget())
@@ -285,7 +311,7 @@ class MainWindow(QMainWindow):
         view.addAction(self.actions["settings"])
         help_menu = self.menuBar().addMenu("Довідка")
         help_menu.addAction("Синтаксис і керування", self.help)
-        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.0\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
+        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.1\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
 
     def create_toolbar(self):
         toolbar=QToolBar('Основні дії',self)
@@ -422,10 +448,15 @@ class MainWindow(QMainWindow):
             self.lab_domain.setZValue(-15)
             self.lab_labels=[pg.TextItem(anchor=(0,1)) for _ in range(4)]
             for label in self.lab_labels:self.canvas.addItem(label,ignoreBounds=True)
-        for item in [self.lab_dots,self.lab_axis,self.lab_domain,self.lab_boundary,*self.lab_labels]:item.hide()
         function=self.current_function()
+        signature=(self.mode,function.id if function else None,function.visible if function else False,
+                   function.color if function else None,tuple((n,p.value) for n,p in function.parameters.items()) if function else (),
+                   self.preferences['theme'],self.preferences['precision'],tuple(c.isChecked() for c in self.learning.toggles.values()))
+        if signature==getattr(self,'lab_marker_signature',None) and self.mode!='logarithmic':return
+        self.lab_marker_signature=signature
+        for item in [self.lab_dots,self.lab_axis,self.lab_domain,self.lab_boundary,*self.lab_labels]:item.hide()
         if self.mode not in LABS or not function or not function.visible:
-            self.graph_hint.setText('  x → праворуч    ·    y ↑ вгору')
+            self.graph_hint.setText('  x →  ·  y ↑')
             return
         values={n:p.value for n,p in function.parameters.items()}
         if self.mode=='logarithmic':
@@ -433,9 +464,9 @@ class MainWindow(QMainWindow):
             self.lab_domain.setRegion((xmin,max(xmin,min(h,xmax))))
             self.lab_domain.setVisible(h>xmin)
             self.lab_boundary.setPos(h);self.lab_boundary.show()
-            self.graph_hint.setText(f"  Область визначення: x > {number(values['h'],self.preferences['precision'])} · сіра область не належить графіку")
-        else:self.graph_hint.setText('  x → праворуч    ·    y ↑ вгору')
-        if self.mode=='quadratic':
+            self.graph_hint.setText(f"  x > {number(values['h'],self.preferences['precision'])}")
+        else:self.graph_hint.setText('  x →  ·  y ↑')
+        if self.mode=='quadratic' and any(check.isChecked() for check in self.learning.toggles.values()):
             data=markers(values,self.preferences['precision']);points=[]
             for key in ['vertex','zeros','intercept']:
                 if self.learning.toggles[key].isChecked():points.extend(data[key])
@@ -452,7 +483,7 @@ class MainWindow(QMainWindow):
             for label,point in zip(self.lab_labels,points):
                 label.setText(point['exact'],color=PALETTES[self.preferences['theme']]['text'])
                 label.setPos(point['x'],point['y']);label.show()
-        if self.mode=='custom':self.graph_hint.setText('  x → праворуч    ·    y ↑ вгору')
+        if self.mode=='custom':self.graph_hint.setText('  x →  ·  y ↑')
 
     def current_function(self):
         return next((f for f in self.project.functions if f.id == self.project.selected), None)
@@ -464,50 +495,68 @@ class MainWindow(QMainWindow):
             row.flush()
 
     def rebuild_editor(self):
-        while self.list_layout.count() > 1:
-            item = self.list_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        self.rows = {}
-        for index, function in enumerate(self.project.functions):
-            row = FunctionRow(function, index, PALETTES[self.preferences["theme"]]["text"])
-            row.changed.connect(self.edit_function)
-            row.selected.connect(self.select)
-            row.visibility.connect(self.visibility)
-            row.removed.connect(self.remove_function)
-            row.duplicated.connect(self.duplicate)
-            row.recolored.connect(self.recolor)
-            row.set_selected(function.id == self.project.selected)
-            self.rows[function.id] = row
-            self.list_layout.insertWidget(self.list_layout.count() - 1, row)
+        current_ids={f.id for f in self.project.functions}
+        for identifier in list(self.rows):
+            if identifier not in current_ids:
+                row=self.rows.pop(identifier);row.timer.stop()
+                self.list_layout.removeWidget(row);row.deleteLater()
+                self.parameter_memory.pop(identifier,None)
+        color=PALETTES[self.preferences['theme']]['text']
+        for index,function in enumerate(self.project.functions):
+            row=self.rows.get(function.id)
+            if row is None:
+                row=FunctionRow(function,index,color)
+                row.changed.connect(self.edit_function);row.selected.connect(self.select)
+                row.visibility.connect(self.visibility);row.removed.connect(self.remove_function)
+                row.duplicated.connect(self.duplicate);row.recolored.connect(self.recolor)
+                self.rows[function.id]=row
+            else:
+                index_changed=row.function_index!=index
+                row.timer.stop();row.function=function;row.function_index=index
+                if row.input.text()!=function.expression or row.text_color!=color or index_changed:
+                    row.input.setText(function.expression);row.text_color=color;row.render()
+                row.color.setStyleSheet(f'color: {function.color}; font-size: 19px;')
+                row.eye.blockSignals(True);row.eye.setChecked(function.visible);row.eye.blockSignals(False)
+            row.input.setAccessibleName(f'Вираз функції {index+1}')
+            row.color.setAccessibleName(f'Змінити колір функції {index+1}')
+            row.eye.setAccessibleName(f'Показати або приховати функцію {index+1}')
+            row.more.setAccessibleName(f'Дії з функцією {index+1}')
+            row.set_selected(function.id==self.project.selected)
+            self.list_layout.insertWidget(index,row)
         self.rebuild_parameters()
         self.update_other_functions()
         self.sync_learning(preserve_custom=True)
 
+    def synchronize_parameters(self, function):
+        try:names=parse(function.expression).parameters
+        except ExpressionError:return None
+        memory=self.parameter_memory.setdefault(function.id,{})
+        memory.update(copy.deepcopy(function.parameters))
+        function.parameters={name:copy.deepcopy(function.parameters.get(name,memory.get(name,Parameter(value=0,initial=0) if name in ('h','k') else Parameter()))) for name in names}
+        return names
+
     def rebuild_parameters(self):
-        while self.parameter_layout.count():
-            item = self.parameter_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        function = self.current_function()
-        if not function:
+        function=self.current_function()
+        names=self.synchronize_parameters(function) if function else ()
+        if names is None:
             self.parameter_scroll.hide()
             return
-        try:
-            names = parse(function.expression).parameters
-        except ExpressionError:
-            names = ()
-        function.parameters={name:function.parameters.get(name,Parameter(value=0,initial=0) if name in ('h','k') else Parameter()) for name in names}
+        signature=(function.id if function else None,tuple((name,tuple(vars(function.parameters[name]).values())) for name in names))
+        if getattr(self,'parameter_signature',None)==signature:
+            self.parameter_scroll.setVisible(bool(names))
+            return
+        self.parameter_signature=signature
+        while self.parameter_layout.count():
+            item=self.parameter_layout.takeAt(0)
+            if item.widget():item.widget().deleteLater()
         if not names:
             self.parameter_scroll.hide()
             return
         self.parameter_scroll.show()
-        title = QLabel("ПАРАМЕТРИ ВИБРАНОЇ ФУНКЦІЇ")
-        title.setObjectName("muted")
+        title=QLabel('ПАРАМЕТРИ ВИБРАНОЇ ФУНКЦІЇ');title.setObjectName('muted')
         self.parameter_layout.addWidget(title)
         for name in names:
-            # Edit a copy so history snapshots retain the previous parameter value.
-            control = ParameterControl(name, copy.deepcopy(function.parameters[name]))
+            control=ParameterControl(name,copy.deepcopy(function.parameters[name]))
             control.changed.connect(self.parameter_changed)
             control.slider.sliderReleased.connect(self.flush_history)
             control.value.editingFinished.connect(self.flush_history)
@@ -550,7 +599,8 @@ class MainWindow(QMainWindow):
     def edit_function(self, identifier, source):
         function = next(f for f in self.project.functions if f.id == identifier)
         function.expression = source
-        self.rebuild_parameters()
+        self.synchronize_parameters(function)
+        if identifier==self.project.selected:self.rebuild_parameters()
         self.record()
         self.update_other_functions()
         self.invalidate_analysis()
@@ -639,6 +689,7 @@ class MainWindow(QMainWindow):
         if not function:
             self.add_function()
             function = self.current_function()
+        if function is None:return
         editor = self.rows[function.id].input
         position = editor.selectionStart() if editor.hasSelectedText() else editor.cursorPosition()
         editor.insert(text)
@@ -720,6 +771,11 @@ class MainWindow(QMainWindow):
         self.reset_document()
 
     def reset_document(self):
+        if hasattr(self,'history_timer'):self.history_timer.stop()
+        self.parameter_memory.clear()
+        self.parameter_signature=None
+        for row in self.rows.values():
+            row.timer.stop();row.input.setText(row.function.expression)
         self.mode=self.project.mode if self.project.mode==identify(self.current_function()) else 'custom'
         self.loading = True
         self.rebuild_editor()
@@ -782,8 +838,9 @@ class MainWindow(QMainWindow):
 
     def recent_paths(self):
         try:
-            return json.loads(self.settings.value("recent", "[]"))
-        except (ValueError, TypeError):
+            values=json.loads(self.settings.value("recent", "[]"))
+            return [p for p in values if isinstance(p,str) and p and not any(c=="\0" or 0xD800<=ord(c)<=0xDFFF for c in p)][:8] if isinstance(values,list) else []
+        except (ValueError, TypeError, RecursionError):
             return []
 
     def update_recents(self):
@@ -811,6 +868,7 @@ class MainWindow(QMainWindow):
             export_graph(self.canvas, path, transparent=dialog.transparent.isChecked(), width=dialog.width.value())
             self.statusBar().showMessage(f"Графік експортовано: {Path(path).name}", 5000)
         except Exception:
+            logger.exception("Graph export failed")
             QMessageBox.warning(self, "Помилка експорту", 'Не вдалося експортувати графік. Спробуйте іншу папку або формат.')
         finally:
             self.canvas.set_coordinates(self.preferences['coordinates'])
@@ -848,11 +906,13 @@ class MainWindow(QMainWindow):
         values = {**self.preferences, "grid": self.project.grid, "axes": self.project.axes}
         dialog = SettingsDialog(self, values)
         if dialog.exec() == QDialog.Accepted:
+            view_changed=dialog.values['default_view']!=self.preferences['default_view']
             self.preferences = dialog.values
             self.project.grid, self.project.axes = self.preferences["grid"], self.preferences["axes"]
             self.canvas.set_coordinates(self.preferences['coordinates'])
             self.cursor_label.setVisible(self.preferences['coordinates'])
             self.set_theme(self.preferences["theme"])
+            if view_changed:self.canvas.set_view(self.preferences["default_view"])
             self.record()
             self.save_preferences()
 
@@ -937,12 +997,13 @@ class MainWindow(QMainWindow):
                     pass
 
     def help(self):
-        QMessageBox.information(self, "Синтаксис і керування", "Введення: x^2, 2^x, sqrt(x), root(x,3), log(x,2), ln(x),\nsin(x), cos(x), tan(x), abs(x), exp(x), pi, e.\nМноження: 2x або 2*x; також підтримано x². Тригонометрія у радіанах.\nПараметри: a*x^2+b*x+c; для кожної функції окремо.\n\nКолесо миші — масштаб; перетягування — панорама.\nКлацніть криву або рядок, щоб вибрати функцію.\nCtrl+B — панель функцій, Ctrl+I — дослідження.\n\nСимвольний аналіз має обмеження 8 секунд.\nНевизначені результати позначаються явно.\nСкінченна вибірка може пропустити надто вузькі особливості;\nзбільшіть потрібну область для перевірки.")
+        QMessageBox.information(self, "Синтаксис і керування", "Введення: x^2, 2^x, sqrt(x), root(x,3), log(x,2), ln(x),\nsin(x), cos(x), tan(x), abs(x), exp(x), pi, e.\nМноження: 2x або 2*x; також підтримано x². Тригонометрія у радіанах.\nПараметри: a*x^2+b*x+c; для кожної функції окремо.\n\nКолесо миші — масштаб; перетягування — переміщення площини.\nКлацніть криву або рядок, щоб вибрати функцію.\nCtrl+B — панель функцій, Ctrl+I — дослідження.\n\nСимвольний аналіз має обмеження 8 секунд.\nНевизначені результати позначаються явно.\nСкінченна вибірка може пропустити надто вузькі особливості;\nзбільшіть потрібну область для перевірки.")
 
     def closeEvent(self, event):
         if self.confirm_discard():
             self.inspector.cancel()
             self.save_preferences()
+            for timer in self.findChildren(QTimer):timer.stop()
             event.accept()
         else:
             event.ignore()
