@@ -50,7 +50,7 @@ class SettingsDialog(QDialog):
             spin.setValue(value)
             self.ranges.append(spin)
             advanced_layout.addRow(label, spin)
-        hint = QLabel("Діапазон застосовується до поточного графіка та скидання виду.")
+        hint = QLabel("Межі поточного вигляду й скидання масштабу власної функції.")
         hint.setWordWrap(True)
         hint.setObjectName("muted")
         advanced_layout.addRow(hint)
@@ -103,8 +103,12 @@ class ExportDialog(QDialog):
         layout.addRow("Ширина (px, PNG / SVG)", self.width)
         self.transparent = QCheckBox("Прозоре тло (PNG)")
         layout.addRow(self.transparent)
-        self.format.currentTextChanged.connect(lambda value: self.transparent.setEnabled(value == "PNG"))
+        self.format.currentTextChanged.connect(self.update_format_controls)
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addRow(buttons)
+
+    def update_format_controls(self, value):
+        self.transparent.setEnabled(value == "PNG")
+        self.width.setEnabled(value in ("PNG", "SVG"))

@@ -1,10 +1,13 @@
 from __future__ import annotations
 import multiprocessing as mp
 import time
+import logging
 from PySide6.QtCore import QTimer, Signal, Qt
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QScrollArea,
                                QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout)
 from graphmath.analysis.symbolic import worker
+
+logger = logging.getLogger(__name__)
 
 
 class Inspector(QWidget):
@@ -70,23 +73,42 @@ class Inspector(QWidget):
                 item.widget().deleteLater()
 
     def start(self, source, parameters, other, other_parameters):
-        self.cancel()
+        if not self.cancel():
+            self.status.setText("Не вдалося зупинити попереднє дослідження. Спробуйте ще раз.")
+            return
         self.result = None
         self.clear_properties()
         self.status.setText("Обчислення… (до 8 секунд)")
         self.run.setEnabled(False)
-        self.connection, send = mp.get_context("spawn").Pipe(duplex=False)
-        self.process = mp.get_context("spawn").Process(target=worker, args=(send, source, parameters, other, other_parameters), daemon=True)
-        self.process.start()
-        send.close()
+        send = None
+        try:
+            context = mp.get_context("spawn")
+            self.connection, send = context.Pipe(duplex=False)
+            self.process = context.Process(target=worker, args=(send, source, parameters, other, other_parameters), daemon=True)
+            self.process.start()
+        except (OSError, RuntimeError, ValueError):
+            logger.exception("Failed to start the symbolic analysis process")
+            self.cancel()
+            self.status.setText("Не вдалося запустити дослідження. Спробуйте ще раз.")
+            return
+        finally:
+            if send is not None:
+                send.close()
         self.started = time.monotonic()
         self.timer.start()
 
     def poll(self):
-        if self.connection and self.connection.poll():
+        try:
+            available = self.connection is not None and self.connection.poll()
+        except (EOFError, OSError):
+            logger.exception("Analysis pipe closed before a result was available")
+            self.cancel()
+            self.status.setText("Не вдалося завершити дослідження. Спробуйте ще раз.")
+            return
+        if available:
             try:
                 message = self.connection.recv()
-            except EOFError:
+            except (EOFError, OSError):
                 message = {"error": "Не вдалося завершити дослідження."}
             self.cancel()
             if "result" in message:
@@ -106,14 +128,28 @@ class Inspector(QWidget):
             self.status.setText("Не вдалося визначити автоматично за відведений час. Спростіть вираз.")
 
     def cancel(self):
+        """Stop and reap the worker, including partially started processes."""
         self.timer.stop()
-        if self.process:
-            if self.process.is_alive():
-                self.process.terminate()
-            self.process.join(timeout=0.2)
-            self.process.close()
-            self.process = None
-        if self.connection:
+        stopped = True
+        if self.process is not None:
+            process = self.process
+            if process.pid is not None:
+                if process.is_alive():
+                    process.terminate()
+                process.join(timeout=0.2)
+                if process.is_alive():
+                    process.kill()
+                    process.join(timeout=0.2)
+                stopped = not process.is_alive()
+            if stopped:
+                process.close()
+                self.process = None
+            else:
+                # Keep the handle so a later cancel can reap it; closing a live
+                # multiprocessing.Process raises and loses its cleanup path.
+                logger.error("Analysis worker did not exit after termination")
+        if self.connection is not None:
             self.connection.close()
             self.connection = None
         self.run.setEnabled(True)
+        return stopped

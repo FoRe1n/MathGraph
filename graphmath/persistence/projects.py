@@ -44,7 +44,7 @@ class Project:
 
 
 def _number(value):
-    if type(value) not in (int, float) or not math.isfinite(value) or abs(value) > 1e12:
+    if type(value) not in (int, float) or abs(value) > 1e12 or not math.isfinite(value):
         raise ValueError("Некоректне числове значення у проєкті.")
     return float(value)
 
@@ -60,6 +60,10 @@ def from_dict(data: dict) -> Project:
             source, color, visible = item["expression"], item["color"], item["visible"]
             if not isinstance(source, str) or len(source) > 600 or not re.fullmatch(r"#[0-9a-fA-F]{6}", color) or type(visible) is not bool:
                 raise ValueError("Некоректний запис функції.")
+            try:
+                source.encode("utf-8")
+            except UnicodeError as exc:
+                raise ValueError("Некоректний текст формули у проєкті.") from exc
             identifier = item["id"]
             if not isinstance(identifier, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", identifier) or identifier in ids:
                 raise ValueError("Некоректний ідентифікатор функції.")
@@ -117,8 +121,8 @@ def load(path: str | Path) -> Project:
         raise ValueError("Файл проєкту завеликий (максимум 2 МБ).")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            raise ValueError("Файл має містити дані математичного проєкту.")
-        return from_dict(data)
-    except (json.JSONDecodeError, UnicodeError, RecursionError) as exc:
+    except (ValueError, UnicodeError, RecursionError, OverflowError) as exc:
         raise ValueError("Не вдалося прочитати JSON проєкту.") from exc
+    if not isinstance(data, dict):
+        raise ValueError("Файл має містити дані математичного проєкту.")
+    return from_dict(data)
