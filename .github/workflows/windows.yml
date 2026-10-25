@@ -28,7 +28,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF_NAME -ne 'mathlab-v1.1.3') { throw 'This source version builds MathLab v1.1.3 only' }
+          if ($env:GITHUB_REF_NAME -ne 'mathlab-v1.1.4') { throw 'This source version builds MathLab v1.1.4 only' }
       - name: Install verified locked dependencies
         run: python -m pip install --require-hashes -r requirements-windows.lock
       - name: Test mathematics, project files and desktop workflows
@@ -77,17 +77,17 @@ jobs:
         run: |
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.md dist/MathLab/
           Copy-Item docs/user-guide.uk.md dist/MathLab/ПОСІБНИК.md
-          Compress-Archive -Path dist/MathLab -DestinationPath MathLab-v1.1.3-Windows-x64.zip
-          if ((Get-Item MathLab-v1.1.3-Windows-x64.zip).Length -lt 1000000) { throw 'Archive is unexpectedly small' }
-          $hash = (Get-FileHash MathLab-v1.1.3-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  MathLab-v1.1.3-Windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
+          Compress-Archive -Path dist/MathLab -DestinationPath MathLab-v1.1.4-Windows-x64.zip
+          if ((Get-Item MathLab-v1.1.4-Windows-x64.zip).Length -lt 1000000) { throw 'Archive is unexpectedly small' }
+          $hash = (Get-FileHash MathLab-v1.1.4-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  MathLab-v1.1.4-Windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
       - name: Verify portable ZIP, SHA256, runtime and AMD64 executable
-        run: python scripts/verify_release_zip.py MathLab-v1.1.3-Windows-x64.zip SHA256SUMS.txt
+        run: python scripts/verify_release_zip.py MathLab-v1.1.4-Windows-x64.zip SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: MathLab-v1.1.3-Windows-x64
+          name: MathLab-v1.1.4-Windows-x64
           path: |
-            MathLab-v1.1.3-Windows-x64.zip
+            MathLab-v1.1.4-Windows-x64.zip
             SHA256SUMS.txt
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -105,16 +105,16 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: MathLab-v1.1.3-Windows-x64
+          name: MathLab-v1.1.4-Windows-x64
           path: release
       - uses: actions/download-artifact@v4
         with:
           name: validation-evidence
           path: validation-evidence
       - name: Archive Windows validation evidence
-        run: python3 -c "import shutil; shutil.make_archive('release/MathLab-v1.1.3-validation', 'zip', 'validation-evidence')"
+        run: python3 -c "import shutil; shutil.make_archive('release/MathLab-v1.1.4-validation', 'zip', 'validation-evidence')"
       - name: Publish verified Windows release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "MathLab v1.1.3" --notes 'Stabilization release with no new function categories. Supersedes earlier stabilization builds after independent checks exposed missing Windows font glyphs and locale-incorrect scientific parameter text; this build registers the bundled Ukrainian-capable UI font and checks actual glyph coverage. Fixes expression domains and analysis, decimal roots, discontinuity rendering, custom parameter precision and undo, malformed settings/projects, worker cleanup and atomic graph exports. Preserves MathLab 1.1 functionality and previous releases. Portable Windows x64: extract the ZIP and launch MathLab.exe, no Python installation required. Native Windows tests, benchmarks, source/frozen smoke and archive verification must pass before publication. Unsigned build; see the bundled user guide and notices.' release/MathLab-v1.1.3-Windows-x64.zip release/SHA256SUMS.txt release/MathLab-v1.1.3-validation.zip
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "MathLab v1.1.4" --notes 'Stabilization release with no new function categories. Supersedes earlier stabilization builds after independent checks exposed missing Windows font glyphs and locale-incorrect scientific parameter text; this build registers the bundled Ukrainian-capable UI font and checks actual glyph coverage. Fixes expression domains and analysis, decimal roots, discontinuity rendering, custom parameter precision and undo, malformed settings/projects, worker cleanup and atomic graph exports. Preserves MathLab 1.1 functionality and previous releases. Portable Windows x64: extract the ZIP and launch MathLab.exe, no Python installation required. Native Windows tests, benchmarks, source/frozen smoke and archive verification must pass before publication. Unsigned build; see the bundled user guide and notices.' release/MathLab-v1.1.4-Windows-x64.zip release/SHA256SUMS.txt release/MathLab-v1.1.4-validation.zip

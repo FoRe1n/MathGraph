@@ -80,3 +80,25 @@ def test_axis_tick_fonts_have_real_numeric_and_ukrainian_glyphs(qtbot, qapp):
         font = canvas.getAxis(name).style['tickFont']
         assert font is not None
         assert_real_glyphs(font)
+
+
+
+def test_existing_control_text_uses_available_glyphs(qtbot,tmp_path):
+    from PySide6.QtCore import QSettings
+    from PySide6.QtWidgets import QAbstractButton,QComboBox,QWidget
+    from graphmath.ui.window import MainWindow
+    from graphmath.core.laboratories import LABS
+    window=MainWindow(QSettings(str(tmp_path/'glyphs.ini'),QSettings.IniFormat))
+    qtbot.addWidget(window,before_close_func=lambda w:setattr(w,'confirm_discard',lambda:True))
+    window.show()
+    for key in [*LABS,'custom']:
+        window.mode_selector.setCurrentIndex(window.mode_selector.findData(key))
+        for widget in window.findChildren(QWidget):
+            if not isinstance(widget,(QLabel,QLineEdit,QAbstractButton,QComboBox)):continue
+            raw=QRawFont.fromFont(widget.font())
+            texts=[widget.itemText(i) for i in range(widget.count())] if isinstance(widget,QComboBox) else [widget.text()]
+            for text in texts:
+                glyphs=raw.glyphIndexesForString(text)
+                assert raw.isValid() and len(glyphs)==len(text),(key,type(widget).__name__,text)
+                missing=[c for c,glyph in zip(text,glyphs) if glyph==0 and not c.isspace()]
+                assert not missing,(key,type(widget).__name__,text,missing)

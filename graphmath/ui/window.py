@@ -186,7 +186,7 @@ class MainWindow(QMainWindow):
         variable_hint.setWordWrap(True);variable_hint.setObjectName('muted');variable_hint.setContentsMargins(12,0,12,4)
         layout.addWidget(variable_hint)
         layout.addWidget(self.scroll, 1)
-        add = QPushButton("＋  Додати функцію")
+        add = QPushButton("+  Додати функцію")
         add.setToolTip("Додати незалежну функцію (до 100)")
         add.clicked.connect(self.add_function)
         layout.addWidget(add)
@@ -311,7 +311,7 @@ class MainWindow(QMainWindow):
         view.addAction(self.actions["settings"])
         help_menu = self.menuBar().addMenu("Довідка")
         help_menu.addAction("Синтаксис і керування", self.help)
-        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.3\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
+        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.4\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
 
     def create_toolbar(self):
         toolbar=QToolBar('Основні дії',self)

@@ -22,7 +22,7 @@ def run(output):
     from PySide6.QtGui import QRawFont
     from PySide6.QtCore import QSettings
     from PySide6.QtTest import QTest
-    from PySide6.QtWidgets import QApplication, QPushButton
+    from PySide6.QtWidgets import QApplication, QPushButton, QLabel, QLineEdit, QAbstractButton, QComboBox, QWidget
     from graphmath.app.localization import install_ukrainian
     from graphmath.core.laboratories import LABS
     from graphmath.persistence.projects import Function, Project
@@ -60,13 +60,22 @@ def run(output):
                     if not raw.isValid() or len(glyphs) != len(probe) or missing:
                         raise RuntimeError(f'Qt UI font cannot render Latin/Ukrainian text: {key}; missing {missing!r}')
                     glyph_coverage[key] = {'family':raw.familyName(),'probe_characters':len(probe),'missing_glyphs':0}
+                for child in widget.findChildren(QWidget):
+                    if not child.isVisible() or not isinstance(child,(QLabel,QLineEdit,QAbstractButton,QComboBox)):continue
+                    raw=QRawFont.fromFont(child.font())
+                    texts=[child.itemText(i) for i in range(child.count())] if isinstance(child,QComboBox) else [child.text()]
+                    for text in texts:
+                        glyphs=raw.glyphIndexesForString(text)
+                        if not raw.isValid() or len(glyphs)!=len(text):raise RuntimeError(f'Invalid actual control font in {name}: {text!r}')
+                        missing=[c for c,glyph in zip(text,glyphs) if glyph==0 and not c.isspace()]
+                        if missing:raise RuntimeError(f'Missing actual control glyphs in {name}: {text!r}; {missing!r}')
                 path = output / (name + '.png')
                 pixmap = widget.grab()
                 if pixmap.isNull() or not pixmap.save(str(path)):
                     raise RuntimeError('Screenshot capture failed: '+name)
                 captures.append({'file': path.name, 'width': pixmap.width(), 'height': pixmap.height(),
                                  'theme': window.preferences['theme'], 'scale': window.preferences['scale'],
-                                 'mode': window.mode, 'description': description})
+                                 'mode': window.mode, 'description': description, 'control_text_glyphs_verified':True})
 
             capture('startup', description='Unmodified default startup screen.')
             for theme in ('light', 'dark'):
