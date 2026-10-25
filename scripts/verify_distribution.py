@@ -13,7 +13,7 @@ for path in required:
 platform_plugin = 'qwindows.dll' if windows else 'libqoffscreen.so'
 if not list(root.rglob(platform_plugin)):
     raise SystemExit(f'Missing Qt platform plugin: {platform_plugin}')
-if not list(root.rglob('DejaVuSans.ttf')):
+if any(not list(root.rglob(name)) for name in ('DejaVuSans.ttf','DejaVuSans-Bold.ttf','DejaVuSans-Oblique.ttf','DejaVuSans-BoldOblique.ttf')):
     raise SystemExit('Missing MathText fonts')
 print('Verified executable, Qt platform plugin, MathText fonts and notices.')
 

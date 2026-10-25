@@ -3,9 +3,10 @@ import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Signal, QTimer, Qt
 from PySide6.QtGui import QFont, QColor
+from PySide6.QtWidgets import QApplication
 from graphmath.core.expressions import evaluate, parse, relation_x
 from graphmath.plotting.sampling import sample
-from graphmath.ui.theme import PALETTES
+from graphmath.ui.theme import PALETTES, ensure_ui_font
 from graphmath.ui.grid import CoordinateGrid
 
 pg.setConfigOptions(antialias=False, useOpenGL=False)
@@ -18,6 +19,7 @@ class Canvas(pg.PlotWidget):
     curves_updated = Signal()
 
     def __init__(self):
+        ensure_ui_font(QApplication.instance())
         super().__init__()
         self.setMinimumWidth(280)
         self.plotItem.setMenuEnabled(False)
@@ -92,7 +94,8 @@ class Canvas(pg.PlotWidget):
             item = self.getAxis(axis)
             item.setPen(pg.mkPen(c["muted"]))
             item.setTextPen(pg.mkPen(c["muted"]))
-            item.setTickFont(QFont("Segoe UI", 10))
+            font=QFont(QApplication.font());font.setPointSize(10)
+            item.setTickFont(font)
         for line in [self.cross_x, self.cross_y]:
             line.setPen(pg.mkPen(c["muted"], width=1, style=Qt.DotLine))
         self.axes_lines = getattr(self, "axes_lines", [])

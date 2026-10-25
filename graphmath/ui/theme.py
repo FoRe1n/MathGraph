@@ -1,5 +1,6 @@
 from __future__ import annotations
-from PySide6.QtGui import QColor, QPalette
+from pathlib import Path
+from PySide6.QtGui import QColor, QPalette, QFont, QFontDatabase, QRawFont
 
 PALETTES = {
     "light": {"canvas": "#FAFAF8", "panel": "#F3F4F1", "surface": "#FFFFFF", "text": "#24272D", "muted": "#707781", "border": "#DFE3E6", "accent": "#4868D8", "selection": "#E8EDFC"},
@@ -7,7 +8,33 @@ PALETTES = {
 }
 
 
+UI_REQUIRED_GLYPHS='MathLab0123456789АБВГҐДЕЄЖЗИІЇЙКЛМНОПРСТУФХЦЧШЩЬЮЯабвгґдеєжзиіїйклмнопрстуфхцчшщьюя→↑−√²↺'
+
+
+def ensure_ui_font(app):
+    """Provide verified Latin/Ukrainian glyphs even on fontless Windows offscreen.
+
+    Matplotlib's licensed DejaVu files are already part of the portable bundle.
+    Register them with Qt as well as using them for mathematical previews.
+    """
+    if getattr(app,'mathlab_ui_font',None):return app.mathlab_ui_font
+    from matplotlib import get_data_path
+    folder=Path(get_data_path())/'fonts'/'ttf'
+    app.mathlab_font_ids=tuple(identifier for name in ('DejaVuSans.ttf','DejaVuSans-Bold.ttf','DejaVuSans-Oblique.ttf','DejaVuSans-BoldOblique.ttf')
+                              if (identifier:=QFontDatabase.addApplicationFont(str(folder/name)))>=0)
+    families=QFontDatabase.families()
+    for family in ('Segoe UI','DejaVu Sans',app.font().family()):
+        if family not in families:continue
+        raw=QRawFont.fromFont(QFont(family,10))
+        if raw.isValid() and all(raw.glyphIndexesForString(UI_REQUIRED_GLYPHS)):
+            app.mathlab_ui_font=family
+            app.setFont(QFont(family,10))
+            return family
+    raise RuntimeError('Не вдалося завантажити шрифт інтерфейсу з українськими літерами.')
+
+
 def apply_theme(app, name: str):
+    family=ensure_ui_font(app)
     c = PALETTES[name]
     p = QPalette()
     for role, key in [(QPalette.Window, "panel"), (QPalette.Base, "surface"), (QPalette.AlternateBase, "panel"),
@@ -17,7 +44,7 @@ def apply_theme(app, name: str):
         p.setColor(role, QColor(c[key]))
     app.setPalette(p)
     app.setStyleSheet(f"""
-        QWidget {{ color: {c['text']}; font-family: 'Segoe UI', 'DejaVu Sans', sans-serif; font-size: 13px; }}
+        QWidget {{ color: {c['text']}; font-family: '{family}', sans-serif; font-size: 13px; }}
         QMainWindow, QDialog {{ background: {c['panel']}; }}
         QToolBar {{ background: {c['surface']}; border: 0; border-bottom: 1px solid {c['border']}; spacing: 3px; padding: 5px; }}
         QToolButton, QPushButton {{ border: 1px solid transparent; background: transparent; padding: 6px 8px; border-radius: 3px; }}

@@ -19,6 +19,7 @@ sys.path.insert(0, os.environ.get('MATHLAB_BENCH_SOURCE', str(Path(__file__).res
 
 
 def run(output):
+    from PySide6.QtGui import QRawFont
     from PySide6.QtCore import QSettings
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication, QPushButton
@@ -32,6 +33,8 @@ def run(output):
     app.setStyle('Fusion'); install_ukrainian(app)
     output.mkdir(parents=True, exist_ok=True)
     captures = []
+    glyph_coverage = {}
+    probe = 'MathLab0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzАБВГҐДЕЄЖЗИІЇЙКЛМНОПРСТУФХЦЧШЩЬЮЯабвгґдеєжзиіїйклмнопрстуфхцчшщьюя→↑−'
     callback_errors = []
     previous_hook = sys.excepthook
     def record_callback_error(kind, value, traceback):
@@ -47,6 +50,16 @@ def run(output):
                 app.processEvents(); QTest.qWait(180)
                 if callback_errors:
                     raise RuntimeError('Qt callback errors: '+'; '.join(callback_errors))
+                fonts = [widget.font()] + [child.font() for child in widget.findChildren(QPushButton) if child.isVisible()]
+                for font in fonts:
+                    key = font.toString()
+                    if key in glyph_coverage:continue
+                    raw = QRawFont.fromFont(font)
+                    glyphs = raw.glyphIndexesForString(probe) if raw.isValid() else []
+                    missing = [character for character, glyph in zip(probe,glyphs) if glyph == 0]
+                    if not raw.isValid() or len(glyphs) != len(probe) or missing:
+                        raise RuntimeError(f'Qt UI font cannot render Latin/Ukrainian text: {key}; missing {missing!r}')
+                    glyph_coverage[key] = {'family':raw.familyName(),'probe_characters':len(probe),'missing_glyphs':0}
                 path = output / (name + '.png')
                 pixmap = widget.grab()
                 if pixmap.isNull() or not pixmap.save(str(path)):
@@ -103,6 +116,7 @@ def run(output):
                 for theme in ('light', 'dark'):
                     window.set_theme(theme); window.resize(780,540)
                     capture(f'narrow-{scale[:-1]}-{theme}', description='Minimum-size window with text scaling.')
+            (output/'font-coverage.json').write_text(json.dumps(glyph_coverage,ensure_ascii=False,indent=2),encoding='utf-8')
             return captures
         finally:
             window.confirm_discard = lambda: True

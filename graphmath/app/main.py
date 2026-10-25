@@ -25,7 +25,7 @@ def main():
     app.setApplicationName("MathLab")
     from graphmath.app.localization import install_ukrainian
     install_ukrainian(app)
-    app.setApplicationVersion("1.1.1")
+    app.setApplicationVersion("1.1.2")
     app.setOrganizationName("GraphMath")
     app.setStyle("Fusion")
     output = Path(args.smoke_output)
@@ -46,6 +46,9 @@ def main():
             from graphmath.core.expressions import evaluate
             import numpy as np
             try:
+                from PySide6.QtGui import QRawFont
+                from graphmath.ui.theme import UI_REQUIRED_GLYPHS
+                assert all(QRawFont.fromFont(window.font()).glyphIndexesForString(UI_REQUIRED_GLYPHS)), "UI glyph coverage failed"
                 window.canvas.refresh()
                 save(window.project, output / "workspace.graphmath")
                 assert load(output / "workspace.graphmath").to_dict() == window.project.to_dict()
@@ -86,7 +89,7 @@ def main():
                 window.toggle_theme()
                 app.processEvents()
                 window.grab().save(str(output / "workspace-dark.png"))
-                (output / "result.json").write_text(json.dumps({"status": "passed", "version": "1.1.1", "exports": ["png", "svg", "pdf"], "project_roundtrip": True, "analysis_subprocess": True, "laboratory_modes": list(LABS), "application": "MathLab"}), encoding="utf-8")
+                (output / "result.json").write_text(json.dumps({"status": "passed", "version": "1.1.2", "exports": ["png", "svg", "pdf"], "project_roundtrip": True, "analysis_subprocess": True, "laboratory_modes": list(LABS), "application": "MathLab", "ui_font": app.mathlab_ui_font, "ui_glyph_coverage": True}), encoding="utf-8")
                 window.flush_inputs()
                 window.saved_state = window.serialized()
                 window.close()
