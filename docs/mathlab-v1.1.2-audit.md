@@ -1,5 +1,9 @@
 # MathLab 1.1.2 stabilization audit
 
+**Superseded by the [v1.1.3 audit](mathlab-v1.1.3-audit.md).**
+Windows font rendering was corrected, but the final parameter locale review
+required another correction before the validated deliverable.
+
 Scope: fixes, performance and verification of the existing twenty templates and
 custom workspace. No new mathematical categories, major interface components,
 project format or dependencies were added. Development branch:
