@@ -78,8 +78,8 @@ LABS.update({
     'direct': _lab('direct', 'Пряма пропорційність · kx', 'k*x', r'kx', (S,)),
     'constant': _lab('constant', 'Стала · y = c', 'c', 'c', (C,)),
     'vertical': _lab('vertical', 'Вертикальна пряма · x = c', 'x=c', 'x=c', (C,)),
-    'inverse': _lab('inverse', 'Обернена пропорційність · k/x', 'a/(x-h)+k', r'\frac{a}{x-h}+k', (A,H,K)),
-    'square': _lab('square', 'Квадрат · ax²', 'a*x^2', r'ax^2', (A,),(-6,6,-3,9)),
+    'inverse': _lab('inverse', 'Обернена пропорційність · a/x', 'a/(x-h)+k', r'\frac{a}{x-h}+k', (A,H,K)),
+    'square': _lab('square', 'Квадратична · ax²', 'a*x^2', r'ax^2', (A,),(-6,6,-3,9)),
     'vertex': _lab('vertex', 'Парабола · a(x − h)² + k', 'a*(x-h)^2+k', r'a(x-h)^2+k', (A,H,K),(-6,6,-3,9)),
     'cubic': _lab('cubic', 'Кубічна · a(x − h)³ + k', 'a*(x-h)^3+k', r'a(x-h)^3+k', (A,H,K)),
     'absolute': _lab('absolute', 'Модуль · a|x − h| + k', 'a*abs(x-h)+k', r'a|x-h|+k', (A,H,K)),
@@ -123,11 +123,44 @@ def validate(key: str, values: dict[str,float]) -> None:
     for c in LABS[key].controls:
         value=values[c.name]
         if not math.isfinite(value) or not c.minimum <= value <= c.maximum or (c.base and (value<=0 or math.isclose(value,1))) or (c.nonzero and value == 0):
-            raise ValueError('Основа має бути додатною та не дорівнювати 1; перевірте межі коефіцієнтів.')
+            if c.base:
+                raise ValueError('Основа має бути додатною, відмінною від 1 і в межах повзунка.')
+            if c.nonzero and value == 0:
+                raise ValueError('Горизонтальний множник не може дорівнювати нулю.')
+            raise ValueError('Коефіцієнт має бути скінченним числом у межах повзунка.')
 
 
 def number(value: float, precision: int = 4) -> str:
-    return f'{0 if abs(value)<1e-12 else value:.{precision}g}'.replace('-', '−').replace('.', ',')
+    return f'{0 if value == 0 else value:.{precision}g}'.replace('-', '−').replace('.', ',')
+
+
+
+def _quadratic_vertex(a: float, b: float, c: float) -> tuple[float,float]:
+    # Slider decimals are exact school coefficients; cancellation must not turn
+    # a zero vertex ordinate into a tiny nonzero value or lose a double root.
+    aa,bb,cc=(Fraction(str(value)) for value in (a,b,c))
+    return float(-bb/(2*aa)),float(cc-bb*bb/(4*aa))
+
+
+def _translated_zero(shift: float, offset: float) -> str:
+    """Retain a nonzero offset when rounding would put a root at a domain hole."""
+    root=shift+offset
+    if offset and number(root)==number(shift):
+        sign=' + ' if offset>0 else ' − '
+        return 'x = '+number(shift)+sign+number(abs(offset))
+    return 'x = '+number(root)
+
+
+
+def _power_equals(base: Fraction, exponent: Fraction, target: Fraction) -> bool:
+    """Exact equality for positive rational powers used by lab zero checks.
+
+    Slider ratios have small integer numerators/denominators. A complexity bound
+    keeps this helper predictable if called directly with arbitrary float input.
+    """
+    if base<=0 or target<=0 or abs(exponent.numerator)>1000 or exponent.denominator>1000:
+        return False
+    return target**exponent.denominator == base**exponent.numerator
 
 
 def explanation(key: str, v: dict[str,float], precision: int = 4) -> str:
@@ -143,7 +176,8 @@ def explanation(key: str, v: dict[str,float], precision: int = 4) -> str:
                     if b else f'a = 0 і b = 0: маємо сталу функцію y = {n(c)}. ') + f'Графік перетинає вісь y у точці (0; {n(c)}).'
         shape='вужча за y = x²' if abs(a)>1 else 'ширша за y = x²' if abs(a)<1 else 'такої самої ширини, як y = x²'
         direction='вгору' if a>0 else 'вниз'
-        return f'Парабола відкрита {direction} і {shape}. Вершина ≈ ({n(-b/(2*a))}; {n(c-b*b/(4*a))}), вісь симетрії: x ≈ {n(-b/(2*a))}. Зміна лише c рухає графік угору або вниз.'
+        x0,y0=_quadratic_vertex(a,b,c)
+        return f'Парабола відкрита {direction} і {shape}. Вершина ≈ ({n(x0)}; {n(y0)}), вісь симетрії: x ≈ {n(x0)}. Зміна лише c рухає графік угору або вниз.'
     if key=='exponential':
         if a==0:
             return f'a = 0: маємо сталу функцію y = {n(v["c"])}. Основа b не змінює цей графік.'
@@ -167,7 +201,7 @@ def details(key: str, values: dict[str,float] | None = None) -> str:
     if key not in ('quadratic','exponential','logarithmic'):
         return template_explanation(key,{c.name:c.default for c in LABS[key].controls})
     return {
-        'quadratic': 'Вершина має координати x₀ = −b/(2a), y₀ = c − b²/(4a), якщо a ≠ 0. Зміна b змінює обидві координати вершини, тому це не просто горизонтальний зсув. Модуль a задає розтягнення по вертикалі; знак a визначає напрям віток. Нулі — дійсні розв’язки ax² + bx + c = 0.',
+        'quadratic': 'Вершина має координати x₀ = −b/(2a), y₀ = c − b²/(4a), якщо a ≠ 0. Зміна b змінює обидві координати вершини, тому це не просто горизонтальний зсув. Модуль a задає вертикальний масштаб; знак a визначає напрям віток. Нулі — дійсні розв’язки ax² + bx + c = 0.',
         'exponential': 'Основа завжди додатна й не дорівнює 1. Наприклад, 2ˣ зростає, а 0,5ˣ спадає. За a < 0 напрям монотонності змінюється через відбиття відносно осі x. За a ≠ 0 пряма y = c — горизонтальна асимптота; перетин із віссю y має ординату a + c.',
         'logarithmic': 'Для логарифма потрібні b > 0, b ≠ 1 та x − h > 0. Точка (h + 1; k) завжди належить графіку. За a ≠ 0 пряма x = h — вертикальна асимптота. За b > 1 базовий логарифм зростає, за 0 < b < 1 — спадає; від’ємне a змінює цей напрям. Навіть за a = 0 початкова формула не визначена при x ≤ h.',
     }[key]
@@ -178,7 +212,7 @@ def markers(v: dict[str,float], precision: int = 4) -> dict:
     a,b,c=(v[n] for n in ['a','b','c'])
     result={'vertex':[], 'zeros':[], 'intercept':[{'x':0.,'y':c,'exact':f'(0; {n(c)})'}], 'symmetry':None}
     if a:
-        x=-b/(2*a);y=c-b*b/(4*a)
+        x,y=_quadratic_vertex(a,b,c)
         result['vertex']=[{'x':x,'y':y,'exact':f'Вершина ≈ ({n(x)}; {n(y)})'}]
         result['symmetry']=x
         # Slider decimals represent exact school coefficients; avoid losing a
@@ -240,7 +274,7 @@ def suggested_view(key: str, values: dict[str,float]) -> list[float]:
     if key=='quadratic':
         b,c=values['b'],values['c']
         if a:
-            x=-b/(2*a);y=c-b*b/(4*a)
+            x,y=_quadratic_vertex(a,b,c)
             return [x-6,x+6,y-3 if a>0 else y-9,y+9 if a>0 else y+3]
         ends=[-6*b+c,6*b+c]
         return [-6,6,min(ends)-3,max(ends)+3]
@@ -263,6 +297,20 @@ def template_explanation(key, v, precision=4):
     if key=='constant':return f"Для кожного x значення y = {n(v['c'])}. Пряма горизонтальна."
     if key=='inverse':return f"Дві вітки за a ≠ 0; x = {n(v['h'])} виключено з області визначення. h рухає графік праворуч, k — вгору. За a = 0 залишається горизонтальна пряма з виколотою точкою."
     text='Додатне h зсуває графік праворуч, додатне k — вгору. Модуль a задає вертикальний масштаб; від’ємне a відбиває графік відносно осі x перед зсувом.'
+    if v.get('a')==0:
+        constant=f"a = 0: y = {n(v.get('k',0))}"
+        if key=='square':
+            return constant+'. Маємо сталу функцію; її графік збігається з віссю x.'
+        if key in ('vertex','cubic','absolute','exponential_shift'):
+            return constant+'. Маємо сталу функцію; горизонтальні параметри не змінюють цей графік.'
+        if key.startswith('sqrt'):
+            return constant+f", але лише за b(x − h) ≥ 0 (b = {n(v['b'])}, h = {n(v['h'])}). Зміна b або h змінює область визначення, а не рівень горизонтальної прямої."
+        if key=='logarithmic_scale':
+            return constant+f", але лише за d(x − h) > 0 (d = {n(v['d'])}, h = {n(v['h'])}). Основа b залишається додатною та відмінною від 1."
+        if key in ('sin','cos'):
+            return constant+'. Функція стала на ℝ: будь-яке додатне число є періодом, найменшого додатного періоду немає. Кути вимірюються в радіанах.'
+        if key=='tan':
+            return constant+'. Значення стале лише там, де b(x − h) ≠ π/2 + nπ, n ∈ ℤ. Виключені точки залишаються виключеними. Кути вимірюються в радіанах.'
     if key=='square':return 'Знак a визначає напрям віток; |a| — вертикальний масштаб. Вершина (0; 0), якщо a ≠ 0.'
     if key.startswith('sqrt') or key in ('sin','cos','tan','exponential_shift','logarithmic_scale'):
         symbol='d' if key in ('exponential_shift','logarithmic_scale') else 'b'
@@ -324,7 +372,7 @@ def properties(key: str, v: dict[str,float]) -> dict[str,str]:
                 result['Перетин із віссю y']=f'(0; {n(offset)})'
                 result['Парність']=parity
                 return result
-            h=-b/(2*a);k=v['c']-b*b/(4*a)
+            h,k=_quadratic_vertex(a,b,v['c'])
         if a==0:
             constant(k);parity='парна і непарна' if k==0 else even
         else:
@@ -332,21 +380,35 @@ def properties(key: str, v: dict[str,float]) -> dict[str,str]:
             result['Монотонність']=f"{'спадає' if a>0 else 'зростає'} на (−∞; {n(h)}]; {'зростає' if a>0 else 'спадає'} на [{n(h)}; +∞)"
             result['Вершина']=f'({n(h)}; {n(k)})'
             parity=even if h==0 else neither
-        if a and -k/a>=0:
-            distance=-k/a if key=='absolute' else math.sqrt(-k/a)
-            result['Нулі']='x = '+', '.join(n(x) for x in sorted({h-distance,h+distance}))
+        aa,hh,kk=(Fraction(str(value)) for value in (a,h,k))
+        if key=='quadratic':
+            roots=markers(v)['zeros']
+            result['Нулі']='x = '+', '.join(n(point['x']) for point in sorted(roots,key=lambda p:p['x'])) if roots else 'немає'
+        elif a and -k/a>=0:
+            if key=='absolute':
+                distance=-kk/aa
+                roots={float(hh-distance),float(hh+distance)}
+            elif aa*hh*hh+kk==0:
+                # Exactly zero is a root; avoid sqrt roundoff changing it to ε.
+                roots={0.,float(2*hh)}
+            else:
+                distance=math.sqrt(-k/a)
+                roots={h-distance,h+distance}
+            result['Нулі']='x = '+', '.join(n(x) for x in sorted(roots))
         else:result['Нулі']='усі x ∈ ℝ' if not a and k==0 else 'немає'
-        y0=a*(abs(h) if key=='absolute' else h*h)+k
+        y0=v['c'] if key=='quadratic' else float(aa*(abs(hh) if key=='absolute' else hh*hh)+kk)
         result['Перетин із віссю y']=f'(0; {n(y0)})'
     elif key=='cubic':
         if not a:constant(k)
         else:
             result['Монотонність']=trend(a)+' на ℝ'
-            root=math.copysign(abs(-k/a)**(1/3),-k/a)+h
+            aa,hh,kk=(Fraction(str(value)) for value in (a,h,k))
+            root=0. if kk-aa*hh**3==0 else math.copysign(abs(-k/a)**(1/3),-k/a)+h
             result['Нулі']='x = '+n(root)
         parity=('парна і непарна' if not k else even) if not a else odd if h==0 and k==0 else neither
         if not a:result['Нулі']='усі x ∈ ℝ' if k==0 else 'немає'
-        result['Перетин із віссю y']=f'(0; {n(k-a*h**3)})'
+        aa,hh,kk=(Fraction(str(value)) for value in (a,h,k))
+        result['Перетин із віссю y']=f'(0; {n(float(kk-aa*hh**3))})'
     elif key=='inverse':
         result['Область визначення']='ℝ ∖ {'+n(h)+'}'
         if a:
@@ -356,16 +418,20 @@ def properties(key: str, v: dict[str,float]) -> dict[str,str]:
         else:constant(k)
         parity=(odd if k==0 else neither) if a else ('парна і непарна' if k==0 else even)
         if h!=0:parity=neither
-        result['Нулі']='x = '+n(h-a/k) if a and k else 'усі x з області визначення' if not a and k==0 else 'немає'
-        result['Перетин із віссю y']='немає' if h==0 else f'(0; {n(k-a/h)})'
+        aa,hh,kk=(Fraction(str(value)) for value in (a,h,k))
+        result['Нулі']='x = '+n(float(hh-aa/kk)) if a and k else 'усі x з області визначення' if not a and k==0 else 'немає'
+        result['Перетин із віссю y']='немає' if h==0 else f'(0; {n(float(kk-aa/hh))})'
     elif key.startswith('sqrt'):
         result['Область визначення']=half(h,b>0,True)
         result['Область значень']=half(k,a>0,True)
         if not a:constant(k)
         else:result['Монотонність']=trend(a*b)+' на області визначення'
-        if a and -k/a>=0:result['Нулі']='x = '+n(h+(-k/a)**2/b)
+        aa,bb,hh,kk=(Fraction(str(value)) for value in (a,b,h,k))
+        if a and -k/a>=0:result['Нулі']='x = '+n(float(hh+(-kk/aa)**2/bb))
         else:result['Нулі']='усі x з області визначення' if not a and k==0 else 'немає'
-        result['Перетин із віссю y']=f'(0; {n(a*math.sqrt(-b*h)+k)})' if -b*h>=0 else 'немає'
+        zero_intercept=bool(a and -kk/aa>=0 and -bb*hh==(-kk/aa)**2)
+        y0=0. if zero_intercept else a*math.sqrt(-b*h)+k if -b*h>=0 else None
+        result['Перетин із віссю y']=f'(0; {n(y0)})' if y0 is not None else 'немає'
     elif key in ('exponential','exponential_shift'):
         if key=='exponential':k=v['c'];h=0;d=1
         else:d=v['d']
@@ -375,8 +441,12 @@ def properties(key: str, v: dict[str,float]) -> dict[str,str]:
             result['Область значень']=half(k,a>0)
             result['Монотонність']=trend(a*math.log(b)*d)+' на ℝ'
             result['Асимптоти']='y = '+n(k)
-        result['Нулі']='x = '+n(h+math.log(-k/a)/(math.log(b)*d)) if a and -k/a>0 else 'усі x ∈ ℝ' if not a and k==0 else 'немає'
-        result['Перетин із віссю y']=f'(0; {n(a*b**(-d*h)+k)})'
+        aa,bb,dd,hh,kk=(Fraction(str(value)) for value in (a,b,d,h,k))
+        zero_intercept=bool(a and _power_equals(bb,-dd*hh,-kk/aa))
+        root=0. if zero_intercept else h+math.log(-k/a)/(math.log(b)*d) if a and -k/a>0 else None
+        result['Нулі']='x = '+n(root) if root is not None else 'усі x ∈ ℝ' if not a and k==0 else 'немає'
+        y0=0. if zero_intercept else a*b**(-d*h)+k
+        result['Перетин із віссю y']=f'(0; {n(y0)})'
     elif key in ('logarithmic','logarithmic_scale'):
         d=v.get('d',1)
         result['Область визначення']=half(h,d>0)
@@ -384,8 +454,11 @@ def properties(key: str, v: dict[str,float]) -> dict[str,str]:
         else:
             result['Монотонність']=trend(a*d/math.log(b))+' на області визначення'
             result['Асимптоти']='x = '+n(h)
-        result['Нулі']='x = '+n(h+b**(-k/a)/d) if a else 'усі x з області визначення' if k==0 else 'немає'
-        result['Перетин із віссю y']=f'(0; {n(a*math.log(-d*h)/math.log(b)+k)})' if -d*h>0 else 'немає'
+        aa,bb,dd,hh,kk=(Fraction(str(value)) for value in (a,b,d,h,k))
+        zero_intercept=bool(a and _power_equals(bb,-kk/aa,-dd*hh))
+        result['Нулі']='x = 0' if zero_intercept else _translated_zero(h,b**(-k/a)/d) if a else 'усі x з області визначення' if k==0 else 'немає'
+        y0=0. if zero_intercept else a*math.log(-d*h)/math.log(b)+k if -d*h>0 else None
+        result['Перетин із віссю y']=f'(0; {n(y0)})' if y0 is not None else 'немає'
     else:  # sin, cos, tan
         phase=b*h
         zero=lambda x:math.isclose(x,0,abs_tol=1e-10)
