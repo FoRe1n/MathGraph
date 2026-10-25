@@ -234,3 +234,11 @@ def test_absolute_value_cannot_reset_the_exact_constant_budget():
 @pytest.mark.parametrize('source', ['tan(sqrt(-1))', '1/sin(sqrt(-1))', '1/tan(sqrt(-1))'])
 def test_nonreal_trigonometric_arguments_remain_undefined_without_phase_errors(source):
     assert np.isnan(evaluate(source,[0,1])).all()
+
+
+
+@pytest.mark.parametrize('atom,value', [('e',math.e),('pi',math.pi)])
+@pytest.mark.parametrize('exponent', [-100,100])
+def test_compact_transcendental_constant_powers_keep_their_existing_support(atom,value,exponent):
+    np.testing.assert_allclose(evaluate(f'{atom}^({exponent})',[0,1]),
+                               [value**exponent,value**exponent],rtol=1e-12,atol=0)

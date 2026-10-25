@@ -39,7 +39,9 @@ def _check_constant_resources(node):
                 raise ExpressionError(message) from None
             return value, max(abs(numerator).bit_length(),denominator.bit_length()), True
         if isinstance(item,ast.Name):
-            return ({'pi':math.pi,'e':math.e}.get(item.id),64,item.id in ('pi','e'))
+            # pi and e remain compact transcendental atoms under a power;
+            # unlike exact rationals, their numerators do not expand in size.
+            return ({'pi':math.pi,'e':math.e}.get(item.id),1,item.id in ('pi','e'))
         if isinstance(item,ast.Call):
             children=[visit(child) for child in item.args]
         else:
