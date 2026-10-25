@@ -1,5 +1,10 @@
 # MathLab 1.1.1 stabilization audit
 
+**Superseded after Windows screenshot inspection found missing UI glyphs.**
+The 453 automated Windows checks passed, but this build was not accepted as the
+final validated deliverable. See the [v1.1.2 audit](mathlab-v1.1.2-audit.md) for
+the font correction, additional regressions and final release verification.
+
 Scope: fixes, performance and verification of the existing twenty templates and
 custom workspace. No new mathematical categories, major interface components,
 project format or dependencies were added. Development branch:
