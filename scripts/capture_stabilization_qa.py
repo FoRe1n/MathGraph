@@ -65,6 +65,7 @@ def run(output):
                     raw=QRawFont.fromFont(child.font())
                     texts=[child.itemText(i) for i in range(child.count())] if isinstance(child,QComboBox) else [child.text()]
                     for text in texts:
+                        if not text:continue
                         glyphs=raw.glyphIndexesForString(text)
                         if not raw.isValid() or len(glyphs)!=len(text):raise RuntimeError(f'Invalid actual control font in {name}: {text!r}')
                         missing=[c for c,glyph in zip(text,glyphs) if glyph==0 and not c.isspace()]

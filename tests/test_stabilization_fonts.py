@@ -98,6 +98,7 @@ def test_existing_control_text_uses_available_glyphs(qtbot,tmp_path):
             raw=QRawFont.fromFont(widget.font())
             texts=[widget.itemText(i) for i in range(widget.count())] if isinstance(widget,QComboBox) else [widget.text()]
             for text in texts:
+                if not text:continue
                 glyphs=raw.glyphIndexesForString(text)
                 assert raw.isValid() and len(glyphs)==len(text),(key,type(widget).__name__,text)
                 missing=[c for c,glyph in zip(text,glyphs) if glyph==0 and not c.isspace()]
