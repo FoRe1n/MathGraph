@@ -1,0 +1,187 @@
+{
+  "status": "passed",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+  "python": "3.12.14",
+  "qt_backend": "offscreen",
+  "source_root": "/tmp/mathlab-polish-baseline",
+  "iterations_per_scenario": 30,
+  "scenarios": {
+    "function_category_switch": {
+      "count": 30,
+      "mean_ms": 70.71,
+      "median_ms": 72.373,
+      "p95_ms": 115.668,
+      "max_ms": 143.665,
+      "operation": "Select an existing template through the real QComboBox; templates prewarmed once.",
+      "before": {
+        "rss_bytes": 208363520,
+        "widget_objects": 405,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 20
+      },
+      "after": {
+        "rss_bytes": 210731008,
+        "widget_objects": 393,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 20
+      }
+    },
+    "custom_formula_update": {
+      "count": 30,
+      "mean_ms": 20.697,
+      "median_ms": 16.686,
+      "p95_ms": 48.098,
+      "max_ms": 55.609,
+      "operation": "Set and commit one of the supported beginner examples in the real function row.",
+      "before": {
+        "rss_bytes": 210735104,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      },
+      "after": {
+        "rss_bytes": 211075072,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      }
+    },
+    "editor_and_analysis_panels": {
+      "count": 30,
+      "mean_ms": 27.057,
+      "median_ms": 25.299,
+      "p95_ms": 49.071,
+      "max_ms": 53.363,
+      "operation": "Alternate the visibility of the existing editor and analysis docks.",
+      "before": {
+        "rss_bytes": 211075072,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      },
+      "after": {
+        "rss_bytes": 210989056,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      }
+    },
+    "mouse_drag_gesture": {
+      "count": 30,
+      "mean_ms": 33.461,
+      "median_ms": 28.082,
+      "p95_ms": 57.8,
+      "max_ms": 58.252,
+      "operation": "Deliver a real Qt mouse press, three moves and release through the viewport; assert a changed X range.",
+      "before": {
+        "rss_bytes": 210989056,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      },
+      "after": {
+        "rss_bytes": 210989056,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      }
+    },
+    "theme_change": {
+      "count": 30,
+      "mean_ms": 173.07,
+      "median_ms": 178.696,
+      "p95_ms": 221.585,
+      "max_ms": 242.825,
+      "operation": "Apply alternating light/dark themes through MainWindow.set_theme.",
+      "before": {
+        "rss_bytes": 210989056,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      },
+      "after": {
+        "rss_bytes": 210993152,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      }
+    },
+    "repeated_zoom_in_out": {
+      "count": 30,
+      "mean_ms": 22.517,
+      "median_ms": 18.478,
+      "p95_ms": 40.389,
+      "max_ms": 57.79,
+      "operation": "Alternate reciprocal ViewBox zoom factors without resetting the function.",
+      "before": {
+        "rss_bytes": 210993152,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      },
+      "after": {
+        "rss_bytes": 210993152,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      }
+    },
+    "window_resize": {
+      "count": 30,
+      "mean_ms": 39.424,
+      "median_ms": 37.867,
+      "p95_ms": 57.692,
+      "max_ms": 75.251,
+      "operation": "Alternate narrow and standard window sizes while the graph is visible.",
+      "before": {
+        "rss_bytes": 210993152,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      },
+      "after": {
+        "rss_bytes": 213852160,
+        "widget_objects": 200,
+        "scene_items": 40,
+        "curve_objects": 1,
+        "sample_cache_entries": 1,
+        "project_function_records": 1
+      }
+    }
+  },
+  "callback_errors": [],
+  "final_state": {
+    "rss_bytes": 213852160,
+    "widget_objects": 200,
+    "scene_items": 40,
+    "curve_objects": 1,
+    "sample_cache_entries": 1,
+    "project_function_records": 1
+  }
+}

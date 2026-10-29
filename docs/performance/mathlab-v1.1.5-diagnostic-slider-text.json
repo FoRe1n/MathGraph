@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "diagnostic_only": true,
+  "font": "Inter",
+  "description": "Alternating same-window current rich paragraph presentation and plain text; identical coefficients, Qt event delivery and forced canvas raster. No repository code changed.",
+  "runs": [
+    {
+      "variant": "rich",
+      "actions": 200,
+      "median_ms": 6.513,
+      "p95_ms": 17.22,
+      "max_ms": 42.183
+    },
+    {
+      "variant": "plain",
+      "actions": 200,
+      "median_ms": 5.44,
+      "p95_ms": 9.94,
+      "max_ms": 19.543
+    },
+    {
+      "variant": "rich",
+      "actions": 200,
+      "median_ms": 6.756,
+      "p95_ms": 19.848,
+      "max_ms": 45.393
+    },
+    {
+      "variant": "plain",
+      "actions": 200,
+      "median_ms": 6.092,
+      "p95_ms": 13.937,
+      "max_ms": 31.646
+    }
+  ]
+}
