@@ -18,7 +18,7 @@ os.environ.setdefault('XDG_CACHE_HOME', str(Path(tempfile.gettempdir()) / 'mathl
 sys.path.insert(0, os.environ.get('MATHLAB_BENCH_SOURCE', str(Path(__file__).resolve().parents[1])))
 
 
-def run(output):
+def run(output, dpi_only=False):
     from PySide6.QtGui import QRawFont
     from PySide6.QtCore import QSettings
     from PySide6.QtTest import QTest
@@ -28,6 +28,7 @@ def run(output):
     from graphmath.persistence.projects import Function, Project
     from graphmath.ui.dialogs import ExportDialog, SettingsDialog
     from graphmath.ui.window import MainWindow
+    from graphmath.ui.theme import ui_text_has_glyphs
 
     app = QApplication.instance() or QApplication([])
     app.setStyle('Fusion'); install_ukrainian(app)
@@ -66,17 +67,48 @@ def run(output):
                     texts=[child.itemText(i) for i in range(child.count())] if isinstance(child,QComboBox) else [child.text()]
                     for text in texts:
                         if not text:continue
-                        glyphs=raw.glyphIndexesForString(text)
-                        if not raw.isValid() or len(glyphs)!=len(text):raise RuntimeError(f'Invalid actual control font in {name}: {text!r}')
-                        missing=[c for c,glyph in zip(text,glyphs) if glyph==0 and not c.isspace()]
-                        if missing:raise RuntimeError(f'Missing actual control glyphs in {name}: {text!r}; {missing!r}')
+                        if not ui_text_has_glyphs(child.font(),text):
+                            raise RuntimeError(f'Missing actual control glyphs in {name}: {text!r}')
                 path = output / (name + '.png')
                 pixmap = widget.grab()
                 if pixmap.isNull() or not pixmap.save(str(path)):
                     raise RuntimeError('Screenshot capture failed: '+name)
                 captures.append({'file': path.name, 'width': pixmap.width(), 'height': pixmap.height(),
+                                 'device_pixel_ratio': pixmap.devicePixelRatio(),
                                  'theme': window.preferences['theme'], 'scale': window.preferences['scale'],
                                  'mode': window.mode, 'description': description, 'control_text_glyphs_verified':True})
+
+            def selector_captures(prefix):
+                window.mode_selector.showPopup()
+                view = window.mode_selector.view()
+                view.scrollToTop()
+                capture(prefix+'-top', target=view.window(), description='Real function popup: first groups, disabled headers.')
+                view.scrollToBottom()
+                capture(prefix+'-bottom', target=view.window(), description='Real function popup: final groups and custom option.')
+                window.mode_selector.hidePopup()
+
+            if dpi_only:
+                for theme in ('light', 'dark'):
+                    window.set_theme(theme)
+                    window.mode_selector.setCurrentIndex(window.mode_selector.findData('quadratic'))
+                    capture('coefficients-'+theme, description='Coefficient controls at native Qt display scaling.')
+                    selector_captures('dropdown-'+theme)
+                    window.mode_selector.setCurrentIndex(window.mode_selector.findData('logarithmic_scale'))
+                    app.processEvents()
+                    bar = window.pages.widget(0).verticalScrollBar()
+                    bar.setValue(bar.maximum())
+                    capture('explanation-'+theme, description='Long mathematical explanation at native Qt display scaling.')
+                    window.mode_selector.setCurrentIndex(window.mode_selector.findData('custom'))
+                    capture('custom-'+theme)
+                    values = {**window.preferences, 'grid': window.project.grid, 'axes': window.project.axes}
+                    dialog = SettingsDialog(window, values); dialog.show()
+                    capture('settings-'+theme, target=dialog)
+                    dialog.close(); dialog.deleteLater()
+                window.mode_selector.setCurrentIndex(window.mode_selector.findData('vertex'))
+                window.resize(780,540)
+                capture('narrow-dark', description='Narrow window at native Qt display scaling.')
+                (output/'font-coverage.json').write_text(json.dumps(glyph_coverage,ensure_ascii=False,indent=2),encoding='utf-8')
+                return captures
 
             capture('startup', description='Unmodified default startup screen.')
             for theme in ('light', 'dark'):
@@ -85,6 +117,11 @@ def run(output):
                     window.mode_selector.setCurrentIndex(window.mode_selector.findData(key))
                     assert window.mode == key
                     capture(f'{key}-{theme}', description=LABS[key].title)
+                window.mode_selector.setCurrentIndex(window.mode_selector.findData('logarithmic_scale'))
+                app.processEvents()
+                bar = window.pages.widget(0).verticalScrollBar()
+                bar.setValue(bar.maximum())
+                capture('long-explanation-'+theme, description='Long explanation scrolled into view; all mathematical sentences preserved.')
                 window.mode_selector.setCurrentIndex(window.mode_selector.findData('custom'))
                 function = Function('a*(x-h)^2+k')
                 window.project = Project([function], [-6,6,-3,9], selected=function.id, mode='custom')
@@ -126,6 +163,7 @@ def run(output):
                 for theme in ('light', 'dark'):
                     window.set_theme(theme); window.resize(780,540)
                     capture(f'narrow-{scale[:-1]}-{theme}', description='Minimum-size window with text scaling.')
+                    selector_captures(f'dropdown-{scale[:-1]}-{theme}')
             (output/'font-coverage.json').write_text(json.dumps(glyph_coverage,ensure_ascii=False,indent=2),encoding='utf-8')
             return captures
         finally:
@@ -139,10 +177,12 @@ def run(output):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=Path('artifacts/audit/screenshots'))
+    parser.add_argument('--dpi-only', action='store_true', help='Focused screenshots in a fresh process using QT_SCALE_FACTOR.')
     args = parser.parse_args()
     (args.output/'manifest.json').unlink(missing_ok=True)
-    captures = run(args.output)
+    captures = run(args.output, args.dpi_only)
     manifest = {'status': 'passed', 'real_qt_captures': len(captures), 'qt_backend': os.environ['QT_QPA_PLATFORM'],
+                'qt_scale_factor': os.environ.get('QT_SCALE_FACTOR', '1'),
                 'source_root': str(Path(sys.path[0]).resolve()), 'captures': captures}
     (args.output/'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     print(json.dumps({'status': 'passed', 'captures': len(captures), 'output': str(args.output)}))

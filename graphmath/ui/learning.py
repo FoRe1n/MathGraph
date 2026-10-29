@@ -1,7 +1,9 @@
 from __future__ import annotations
+from html import escape
+import re
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QLabel,QSlider,QDoubleSpinBox,
-    QAbstractSpinBox,QPushButton,QCheckBox,QGridLayout,QMessageBox)
+    QAbstractSpinBox,QPushButton,QCheckBox,QGridLayout,QMessageBox,QSizePolicy,QLayout)
 from graphmath.core.laboratories import LABS, Control, explanation, details, number, formula_latex
 from graphmath.ui.formula import FormulaLabel
 from graphmath.ui.theme import PALETTES
@@ -15,10 +17,15 @@ class CoefficientControl(QWidget):
         super().__init__()
         self.control=control
         self.ticks=control.values()
-        layout=QVBoxLayout(self);layout.setContentsMargins(0,5,0,5);layout.setSpacing(5)
-        row=QHBoxLayout()
-        label=QLabel(control.label);label.setWordWrap(True)
-        row.addWidget(label,1)
+        layout=QVBoxLayout(self);layout.setContentsMargins(0,8,0,10);layout.setSpacing(9)
+        row=QHBoxLayout();row.setSpacing(12)
+        self.label=QLabel(control.label);self.label.setWordWrap(True)
+        self.label.setMinimumWidth(0)
+        # Keep QLabel's height-for-width flag when relaxing its width hint;
+        # replacing the policy discards that flag and can compress long labels.
+        policy=self.label.sizePolicy();policy.setHorizontalPolicy(QSizePolicy.Ignored)
+        self.label.setSizePolicy(policy)
+        row.addWidget(self.label,1)
         self.value=QDoubleSpinBox()
         self.value.setButtonSymbols(QAbstractSpinBox.NoButtons)
         self.value.setDecimals(1);self.value.setRange(control.minimum,control.maximum)
@@ -27,6 +34,7 @@ class CoefficientControl(QWidget):
         self.value.setAccessibleName(f'Змінити коефіцієнт {control.name}')
         row.addWidget(self.value);layout.addLayout(row)
         self.slider=QSlider(Qt.Horizontal)
+        self.slider.setMinimumHeight(22)
         self.slider.setRange(0,len(self.ticks)-1)
         self.slider.setValue(min(range(len(self.ticks)),key=lambda i:abs(self.ticks[i]-value)))
         self.slider.setAccessibleName(f'Повзунок коефіцієнта {control.name}')
@@ -61,6 +69,7 @@ class LearningPanel(QWidget):
         super().__init__()
         self.key=None;self.controls={};self.values={};self.color=PALETTES['light']['text']
         layout=QVBoxLayout(self);layout.setContentsMargins(16,6,16,10);layout.setSpacing(8)
+        layout.setSizeConstraint(QLayout.SetMinAndMaxSize)
         self.formula=FormulaLabel();self.formula.setMinimumHeight(52)
         layout.addWidget(self.formula)
         self.numeric=FormulaLabel()
@@ -70,10 +79,12 @@ class LearningPanel(QWidget):
         self.show_graph.clicked.connect(self.visibility_requested)
         self.show_graph.hide()
         layout.addWidget(self.show_graph)
-        self.controls_layout=QVBoxLayout();self.controls_layout.setSpacing(2)
+        self.controls_layout=QVBoxLayout();self.controls_layout.setSpacing(4)
         layout.addLayout(self.controls_layout)
         self.explanation=QLabel();self.explanation.setWordWrap(True)
-        self.explanation.setStyleSheet('line-height: 1.5;')
+        self.explanation.setTextFormat(Qt.RichText)
+        self.explanation.setAlignment(Qt.AlignLeft|Qt.AlignTop)
+        self.explanation.setContentsMargins(0,10,0,4)
         layout.addWidget(self.explanation)
         more=QPushButton('Докладніше');more.clicked.connect(self.show_details)
         more.setStyleSheet('text-align: left; padding-left: 0;')
@@ -122,7 +133,15 @@ class LearningPanel(QWidget):
         self.preview_timer.start()
 
     def update_text(self):
-        self.explanation.setText(explanation(self.key,self.values,self.precision))
+        text=explanation(self.key,self.values,self.precision)
+        # Qt stylesheets do not implement label line-height. Rich-text block
+        # formatting supplies real leading and paragraph spacing without changing
+        # the independently verified mathematical sentences.
+        paragraphs=re.split(r'(?<=\.)\s+(?=[А-ЯІЇЄҐA-Za-z])',text)
+        self.explanation.setText(''.join(
+            '<p style="margin-top:0; margin-bottom:8px; line-height:125%;">'+escape(part)+'</p>'
+            for part in paragraphs))
+        self.explanation.setAccessibleDescription(text)
 
 
     def render_formula(self):

@@ -7,10 +7,11 @@ import re
 from pathlib import Path
 import numpy as np
 from PySide6.QtCore import Qt, QSettings, QSize, QTimer
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtGui import QAction, QKeySequence, QFont, QFontMetrics, QPalette
 from PySide6.QtWidgets import (QMainWindow, QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QDockWidget, QScrollArea, QPushButton, QLabel, QToolBar, QToolButton, QFileDialog,
-    QMessageBox, QLineEdit, QAbstractSpinBox, QMenu, QDialog, QStackedWidget, QComboBox, QDoubleSpinBox, QGridLayout, QSizePolicy)
+    QMessageBox, QLineEdit, QAbstractSpinBox, QMenu, QDialog, QStackedWidget, QComboBox, QDoubleSpinBox, QGridLayout, QSizePolicy,
+    QStyledItemDelegate, QStyleOptionViewItem)
 from graphmath.core.expressions import parse, ExpressionError
 from graphmath.persistence.projects import Project, Function, Parameter, COLORS, from_dict, save, load
 from graphmath.plotting.export import export_graph
@@ -25,6 +26,44 @@ from graphmath.ui.learning import LearningPanel
 
 
 logger=logging.getLogger(__name__)
+
+
+class FunctionSelectorDelegate(QStyledItemDelegate):
+    """Keep the standard combo navigation, with quiet, distinct group headings."""
+    HEADER_ROLE=Qt.UserRole+1
+    SEPARATOR_ROLE=Qt.UserRole+2
+
+    def sizeHint(self,option,index):
+        size=super().sizeHint(option,index)
+        size.setHeight(max(size.height(),option.fontMetrics.height())+10)
+        if index.data(self.HEADER_ROLE):
+            font=QFont(option.font);font.setWeight(QFont.DemiBold)
+            size.setWidth(max(size.width(),QFontMetrics(font).horizontalAdvance(index.data())+20))
+        return size
+
+    def paint(self,painter,option,index):
+        opt=QStyleOptionViewItem(option)
+        self.initStyleOption(opt,index)
+        separator=opt.palette.color(QPalette.Active,QPalette.Text)
+        separator.setAlpha(40)
+        if index.data(self.HEADER_ROLE):
+            painter.save()
+            painter.fillRect(opt.rect,opt.palette.brush(QPalette.AlternateBase))
+            if index.row():
+                painter.setPen(separator)
+                painter.drawLine(opt.rect.topLeft(),opt.rect.topRight())
+            opt.font.setWeight(QFont.DemiBold)
+            painter.setFont(opt.font)
+            painter.setPen(opt.palette.color(QPalette.Active,QPalette.Text))
+            painter.drawText(opt.rect.adjusted(10,0,-10,0),Qt.AlignLeft|Qt.AlignVCenter,opt.text)
+            painter.restore()
+        else:
+            super().paint(painter,opt,index)
+            if index.data(self.SEPARATOR_ROLE):
+                painter.save()
+                painter.setPen(separator)
+                painter.drawLine(opt.rect.topLeft(),opt.rect.topRight())
+                painter.restore()
 
 
 class MainWindow(QMainWindow):
@@ -230,17 +269,19 @@ class MainWindow(QMainWindow):
         brand = QLabel('MathLab')
         brand.setStyleSheet('font-size: 23px; font-weight: 600; padding: 15px 16px 0 16px;')
         outer.addWidget(brand)
-        hint=QLabel('Змінюйте коефіцієнти. Спостерігайте за графіком.')
-        hint.setObjectName('muted');hint.setWordWrap(True);hint.setContentsMargins(16,0,16,5)
-        outer.addWidget(hint)
         self.mode_selector=QComboBox()
         selector_title=QLabel('Оберіть функцію');selector_title.setContentsMargins(16,0,16,0);outer.addWidget(selector_title)
         self.mode_selector.setAccessibleName('Оберіть функцію')
+        self.mode_selector.setItemDelegate(FunctionSelectorDelegate(self.mode_selector))
+        self.mode_selector.view().setUniformItemSizes(False)
         for title,keys in GROUPS:
             self.mode_selector.addItem(title,None)
-            self.mode_selector.model().item(self.mode_selector.count()-1).setEnabled(False)
+            heading=self.mode_selector.model().item(self.mode_selector.count()-1)
+            heading.setFlags(Qt.NoItemFlags)
+            heading.setData(True,FunctionSelectorDelegate.HEADER_ROLE)
             for key in keys:self.mode_selector.addItem(LABS[key].title,key)
         self.mode_selector.addItem('Власна функція','custom')
+        self.mode_selector.setItemData(self.mode_selector.count()-1,True,FunctionSelectorDelegate.SEPARATOR_ROLE)
         selector_layout=QHBoxLayout();selector_layout.setContentsMargins(16,0,16,0)
         selector_layout.addWidget(self.mode_selector);outer.addLayout(selector_layout)
         self.learning=LearningPanel()
@@ -311,7 +352,7 @@ class MainWindow(QMainWindow):
         view.addAction(self.actions["settings"])
         help_menu = self.menuBar().addMenu("Довідка")
         help_menu.addAction("Синтаксис і керування", self.help)
-        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.4\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
+        help_menu.addAction("Про MathLab", lambda: QMessageBox.about(self, "MathLab 1.1", "MathLab 1.1.5\nМатематичний простір для досліджень.\nПрацює офлайн · ліцензія MIT\n\nQt / PySide6 (LGPLv3), PyQtGraph (MIT), SymPy (BSD),\nNumPy (BSD), Matplotlib (PSF-compatible).\nПовні ліцензії постачаються з програмою."))
 
     def create_toolbar(self):
         toolbar=QToolBar('Основні дії',self)
