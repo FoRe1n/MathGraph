@@ -93,16 +93,29 @@ def test_axes_and_known_coordinate_mapping(lab,source,points):
 
 
 def test_cached_pan_does_not_resample_or_serialize(lab,qtbot):
-    lab.canvas.refine_timer.stop();lab.canvas.resample_timer.stop()
-    before=lab.canvas.sample_count
-    with patch.object(lab,'serialized',side_effect=AssertionError('Serialization in viewport path')):
-        for _ in range(20):
-            lab.canvas.viewbox.translateBy(x=.01)
-            lab.canvas.flush_refresh()
-        qtbot.wait(90)
-    assert lab.canvas.sample_count==before
-    qtbot.wait(180)
-    assert lab.canvas.sample_count<=before+2
+    canvas=lab.canvas
+    canvas.refine_timer.stop();canvas.resample_timer.stop()
+    interval=canvas.refine_timer.interval()
+    # Separate cache reuse from legitimate idle refinement. A loaded Qt event
+    # loop may overrun the old 90ms wait and deliver the production 140ms timer.
+    canvas.refine_timer.setInterval(10000)
+    try:
+        before=canvas.sample_count
+        with patch.object(lab,'serialized',side_effect=AssertionError('Serialization in viewport path')):
+            for _ in range(20):
+                canvas.viewbox.translateBy(x=.01)
+                canvas.flush_refresh()
+            qtbot.wait(90)
+            assert canvas.sample_count==before
+            assert canvas.refine_timer.isActive() and canvas.interacting
+        # Deliver the real timeout callback and require completed refinement;
+        # the former upper-bound-only assertion also allowed no refinement.
+        canvas.refine_timer.setInterval(1)
+        qtbot.waitUntil(lambda:not canvas.refine_timer.isActive() and not canvas.interacting,timeout=1000)
+        assert before+1<=canvas.sample_count<=before+2
+    finally:
+        canvas.refine_timer.stop()
+        canvas.refine_timer.setInterval(interval)
 
 
 def test_markers_domain_and_custom_retained(lab,qtbot):
