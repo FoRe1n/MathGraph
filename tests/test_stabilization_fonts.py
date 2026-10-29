@@ -7,7 +7,7 @@ from PySide6.QtGui import QFont, QFontDatabase, QFontInfo, QFontMetrics, QRawFon
 from PySide6.QtWidgets import QLabel, QLineEdit, QPushButton
 import pytest
 
-from graphmath.ui.theme import apply_theme, ensure_ui_font
+from graphmath.ui.theme import apply_theme, ensure_ui_font, ui_text_has_glyphs
 
 
 UI_GLYPHS = (
@@ -95,11 +95,7 @@ def test_existing_control_text_uses_available_glyphs(qtbot,tmp_path):
         window.mode_selector.setCurrentIndex(window.mode_selector.findData(key))
         for widget in window.findChildren(QWidget):
             if not isinstance(widget,(QLabel,QLineEdit,QAbstractButton,QComboBox)):continue
-            raw=QRawFont.fromFont(widget.font())
             texts=[widget.itemText(i) for i in range(widget.count())] if isinstance(widget,QComboBox) else [widget.text()]
             for text in texts:
                 if not text:continue
-                glyphs=raw.glyphIndexesForString(text)
-                assert raw.isValid() and len(glyphs)==len(text),(key,type(widget).__name__,text)
-                missing=[c for c,glyph in zip(text,glyphs) if glyph==0 and not c.isspace()]
-                assert not missing,(key,type(widget).__name__,text,missing)
+                assert ui_text_has_glyphs(widget.font(),text),(key,type(widget).__name__,text)
