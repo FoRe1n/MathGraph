@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import subprocess
 import tempfile
 import time
@@ -23,14 +23,60 @@ def read_json(path):
         return None
 
 
+def windows_environment(source, backend: str) -> tuple[dict, Path]:
+    """Prepare a Windows child environment without relying on dict key casing.
+
+    Windows os.environ is case-insensitive, but its copied ordinary dict is not.
+    Python commonly copies the key as SYSTEMROOT, even when callers use SystemRoot.
+    """
+    system_root_value = next((value for key, value in source.items()
+                              if key.casefold() == 'systemroot'), None)
+    if not system_root_value:
+        raise RuntimeError('Windows SystemRoot environment variable is missing')
+    removed = {'path', 'pythonpath', 'pythonhome', 'qt_qpa_platform'}
+    environment = {key: value for key, value in source.items() if key.casefold() not in removed}
+    windows_root = PureWindowsPath(system_root_value)
+    environment['PATH'] = ';'.join(map(str, (windows_root/'System32', windows_root)))
+    environment['QT_QPA_PLATFORM'] = backend
+    return environment, Path(system_root_value)
+
+
+def report_failure(output: Path, error: Exception) -> None:
+    """Expose useful diagnostics in public Actions annotations and artifacts."""
+    details = [f'{type(error).__name__}: {error}']
+    for name in ('error.txt', 'stderr.log'):
+        for path in sorted(output.rglob(name)) if output.exists() else []:
+            try:
+                with path.open('rb') as stream:
+                    stream.seek(max(0, path.stat().st_size-4000))
+                    tail = stream.read().decode('utf-8', errors='replace').strip()
+            except OSError:
+                continue
+            if tail:
+                details.append(f'{path.relative_to(output)}:\n{tail}')
+    diagnostic = details[0]
+    if len(details) > 1:
+        diagnostic += '\n\n'+'\n\n'.join(details[1:])[-12000:]
+    escaped = diagnostic.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+    print('::error title=Packaged Windows validation failed::'+escaped, flush=True)
+    try:
+        output.mkdir(parents=True, exist_ok=True)
+        (output/'failure.json').write_text(json.dumps({'status': 'failed', 'diagnostics': diagnostic},
+                                                      ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+        summary = os.environ.get('GITHUB_STEP_SUMMARY')
+        if summary:
+            with Path(summary).open('a', encoding='utf-8') as stream:
+                stream.write('\nPackaged Windows validation failed.\n\n```text\n'+
+                             diagnostic.replace('```', '` ` `')+'\n```\n')
+    except OSError:
+        # The annotation is already emitted; never hide the original failure if
+        # the runner cannot write optional artifact/step-summary diagnostics.
+        pass
+
+
 def verify_launch(executable: Path, output: Path, kind: str, version: str, timeout: float, backend: str) -> dict:
     output.mkdir(parents=True, exist_ok=False)
-    environment = os.environ.copy()
-    system_root = Path(environment['SystemRoot'])
-    environment['PATH'] = os.pathsep.join(map(str, (system_root/'System32', system_root)))
-    environment.pop('PYTHONPATH', None)
-    environment.pop('PYTHONHOME', None)
-    environment['QT_QPA_PLATFORM'] = backend
+    environment, system_root = windows_environment(os.environ, backend)
     ready_path = output/'ready.json'
     process = None
     started = time.perf_counter()
@@ -142,4 +188,8 @@ if __name__ == '__main__':
     parser.add_argument('--version', required=True)
     parser.add_argument('--timeout', type=float, default=120)
     args = parser.parse_args()
-    print(json.dumps(verify(args.onedir, args.onefile, args.output, args.version, args.timeout), indent=2))
+    try:
+        print(json.dumps(verify(args.onedir, args.onefile, args.output, args.version, args.timeout), indent=2))
+    except Exception as error:
+        report_failure(args.output.resolve(), error)
+        raise
