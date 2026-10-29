@@ -1,7 +1,7 @@
-name: MathLab Windows portable build
+name: MathLab Windows portable and one-file builds
 on:
   push:
-    branches: [main, feature/mathlab-v1.1, fix/mathlab-v1.1.1-audit]
+    branches: [main, feature/mathlab-v1.1, fix/mathlab-v1.1.1-audit, fix/mathlab-v1.1.5-polish]
     tags: ['v*', 'mathlab-v*']
   pull_request:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       QT_QPA_PLATFORM: offscreen
       PYTHONUTF8: '1'
@@ -28,66 +28,79 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF_NAME -ne 'mathlab-v1.1.4') { throw 'This source version builds MathLab v1.1.4 only' }
+          if ($env:GITHUB_REF_NAME -ne 'mathlab-v1.1.5') { throw 'This source version builds MathLab v1.1.5 only' }
       - name: Install verified locked dependencies
         run: python -m pip install --require-hashes -r requirements-windows.lock
       - name: Test mathematics, project files and desktop workflows
         run: python -m pytest -q --junitxml=artifacts/tests.xml
+      - name: Check out the published baseline for same-runner comparisons
+        uses: actions/checkout@v4
+        with:
+          ref: mathlab-v1.1.4
+          path: .benchmark-baseline
+          persist-credentials: false
+      - name: Measure published baseline interactions on the same runner
+        env:
+          MATHLAB_BENCH_SOURCE: ${{ github.workspace }}/.benchmark-baseline
+        run: python scripts/benchmark_interaction.py --output artifacts/baseline-interaction.json --frames 30 --session-steps 400
+      - name: Measure published baseline stabilization workloads on the same runner
+        env:
+          MATHLAB_BENCH_SOURCE: ${{ github.workspace }}/.benchmark-baseline
+        run: python scripts/benchmark_stabilization.py --frames 20 --output artifacts/baseline-stabilization.json
       - name: Measure offscreen interactions
-        run: python scripts/benchmark_interaction.py --output artifacts/interaction-benchmark.json --frames 30
+        run: python scripts/benchmark_interaction.py --output artifacts/interaction-benchmark.json --frames 30 --session-steps 400
       - name: Measure stabilization workloads
         run: python scripts/benchmark_stabilization.py --frames 20 --output artifacts/stabilization-benchmark.json
       - name: Source application smoke test
         run: python -m graphmath --smoke-test --smoke-output artifacts/source-smoke
-      - name: Capture actual learning workspace screenshots
+      - name: Capture actual workspace, dropdown and typography screenshots
         run: python scripts/capture_stabilization_qa.py --output artifacts/screenshots
+      - name: Capture actual Qt 125 percent display scaling
+        env:
+          QT_SCALE_FACTOR: '1.25'
+        run: python scripts/capture_stabilization_qa.py --dpi-only --output artifacts/screenshots-dpi125
+      - name: Capture actual Qt 150 percent display scaling
+        env:
+          QT_SCALE_FACTOR: '1.5'
+        run: python scripts/capture_stabilization_qa.py --dpi-only --output artifacts/screenshots-dpi150
       - name: Collect bundled license notices
         run: python scripts/collect_licenses.py build/licenses
       - name: Build portable application
         run: python -m PyInstaller --noconfirm --clean GraphMath.spec
-      - name: Verify packaged resources
+      - name: Verify portable packaged resources
         run: python scripts/verify_distribution.py dist/MathLab
-      - name: Frozen application smoke test outside checkout without Python on PATH
-        shell: pwsh
-        run: |
-          $exePath = (Resolve-Path dist/MathLab/MathLab.exe).Path
-          $smokeOutput = Join-Path $env:GITHUB_WORKSPACE 'artifacts/frozen-smoke'
-          $frozenWorkingDir = Join-Path $env:RUNNER_TEMP 'mathlab-frozen-validation'
-          New-Item -ItemType Directory -Path $frozenWorkingDir -Force | Out-Null
-          $savedPath = $env:PATH
-          $savedPythonPath = $env:PYTHONPATH
-          $savedPythonHome = $env:PYTHONHOME
-          try {
-            $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
-            $env:PYTHONPATH = ''
-            $env:PYTHONHOME = ''
-            $arguments = @('--smoke-test', '--smoke-output', ('"' + $smokeOutput + '"'))
-            $process = Start-Process -FilePath $exePath -WorkingDirectory $frozenWorkingDir -ArgumentList $arguments -PassThru
-            if (-not $process.WaitForExit(90000)) { $process.Kill(); throw 'Frozen startup timed out' }
-            if ($process.ExitCode -ne 0) { throw "Frozen smoke exit code: $($process.ExitCode)" }
-            $result = Get-Content (Join-Path $smokeOutput 'result.json') | ConvertFrom-Json
-            if ($result.status -ne 'passed' -or -not $result.ui_glyph_coverage) { throw 'Frozen smoke or UI font verification failed' }
-          } finally {
-            $env:PATH = $savedPath
-            $env:PYTHONPATH = $savedPythonPath
-            $env:PYTHONHOME = $savedPythonHome
-          }
-      - name: Package portable ZIP
+      - name: Build single-file application
+        env:
+          GRAPHMATH_ONEFILE: '1'
+        run: python -m PyInstaller --noconfirm --clean --distpath dist-onefile --workpath build/onefile GraphMath.spec
+      - name: Verify embedded one-file runtime, resources, fonts, licenses and modules
+        run: python scripts/verify_onefile.py dist-onefile/MathLab.exe --output artifacts/onefile-archive.json
+      - name: Verify both frozen formats outside checkout without Python on PATH
+        run: python scripts/verify_frozen_app.py --onedir dist/MathLab/MathLab.exe --onefile dist-onefile/MathLab.exe --output artifacts/packaged-validation --version 1.1.5
+      - name: Package release files and checksums
         shell: pwsh
         run: |
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.md dist/MathLab/
           Copy-Item docs/user-guide.uk.md dist/MathLab/ПОСІБНИК.md
-          Compress-Archive -Path dist/MathLab -DestinationPath MathLab-v1.1.4-Windows-x64.zip
-          if ((Get-Item MathLab-v1.1.4-Windows-x64.zip).Length -lt 1000000) { throw 'Archive is unexpectedly small' }
-          $hash = (Get-FileHash MathLab-v1.1.4-Windows-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  MathLab-v1.1.4-Windows-x64.zip" | Set-Content -Encoding ascii SHA256SUMS.txt
-      - name: Verify portable ZIP, SHA256, runtime and AMD64 executable
-        run: python scripts/verify_release_zip.py MathLab-v1.1.4-Windows-x64.zip SHA256SUMS.txt
+          Compress-Archive -Path dist/MathLab -DestinationPath MathLab-v1.1.5-Windows-x64.zip
+          Copy-Item dist-onefile/MathLab.exe MathLab-v1.1.5-Windows-x64-OneFile.exe
+          $names = @('MathLab-v1.1.5-Windows-x64.zip', 'MathLab-v1.1.5-Windows-x64-OneFile.exe')
+          $sums = foreach ($name in $names) {
+            if ((Get-Item $name).Length -lt 1000000) { throw "Release file is unexpectedly small: $name" }
+            $hash = (Get-FileHash $name -Algorithm SHA256).Hash.ToLower()
+            "$hash  $name"
+          }
+          $sums | Set-Content -Encoding ascii SHA256SUMS.txt
+      - name: Verify public ZIP and SHA256
+        run: python scripts/verify_release_zip.py MathLab-v1.1.5-Windows-x64.zip SHA256SUMS.txt
+      - name: Verify public single-file EXE and SHA256
+        run: python scripts/verify_onefile.py MathLab-v1.1.5-Windows-x64-OneFile.exe --checksums SHA256SUMS.txt --output artifacts/onefile-release.json
       - uses: actions/upload-artifact@v4
         with:
-          name: MathLab-v1.1.4-Windows-x64
+          name: MathLab-v1.1.5-Windows-x64
           path: |
-            MathLab-v1.1.4-Windows-x64.zip
+            MathLab-v1.1.5-Windows-x64.zip
+            MathLab-v1.1.5-Windows-x64-OneFile.exe
             SHA256SUMS.txt
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -105,16 +118,23 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: MathLab-v1.1.4-Windows-x64
+          name: MathLab-v1.1.5-Windows-x64
           path: release
       - uses: actions/download-artifact@v4
         with:
           name: validation-evidence
           path: validation-evidence
       - name: Archive Windows validation evidence
-        run: python3 -c "import shutil; shutil.make_archive('release/MathLab-v1.1.4-validation', 'zip', 'validation-evidence')"
+        run: python3 -c "import shutil; shutil.make_archive('release/MathLab-v1.1.5-validation', 'zip', 'validation-evidence')"
       - name: Publish verified Windows release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "MathLab v1.1.4" --notes 'Stabilization release with no new function categories. Supersedes earlier stabilization builds after independent checks exposed missing Windows font glyphs and locale-incorrect scientific parameter text; this build registers the bundled Ukrainian-capable UI font and checks actual glyph coverage. Fixes expression domains and analysis, decimal roots, discontinuity rendering, custom parameter precision and undo, malformed settings/projects, worker cleanup and atomic graph exports. Preserves MathLab 1.1 functionality and previous releases. Portable Windows x64: extract the ZIP and launch MathLab.exe, no Python installation required. Native Windows tests, benchmarks, source/frozen smoke and archive verification must pass before publication. Unsigned build; see the bundled user guide and notices.' release/MathLab-v1.1.4-Windows-x64.zip release/SHA256SUMS.txt release/MathLab-v1.1.4-validation.zip
+          cat > release-notes.md <<'EOF'
+          Focused typography and packaging polish; mathematical algorithms and graph interaction remain unchanged. Bundled OFL-licensed Inter with Ukrainian glyph checks, clearer coefficient/explanation spacing, grouped nonselectable dropdown headings and removal of the redundant introductory instruction.
+
+          Download the single-file Windows x64 EXE, or extract the portable ZIP and launch MathLab.exe. No Python installation is required. Both formats passed native Windows startup, coefficient, plotting, project saving, analysis worker, font/resource and PNG/SVG/PDF smoke checks outside the source checkout with Python removed from PATH. The validation ZIP contains test results, actual Qt screenshots at 100/125/150 percent display scaling, startup timings and benchmarks.
+
+          One-file startup includes temporary extraction and can be slower; antivirus may flag unsigned executables. The portable ZIP remains available, including for replacing LGPL libraries. Physical Windows 11 compositor behavior, antivirus reputation and hardware FPS are not established by offscreen CI. Previous releases remain preserved.
+          EOF
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "MathLab v1.1.5" --notes-file release-notes.md release/MathLab-v1.1.5-Windows-x64.zip release/MathLab-v1.1.5-Windows-x64-OneFile.exe release/SHA256SUMS.txt release/MathLab-v1.1.5-validation.zip

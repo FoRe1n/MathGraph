@@ -5,6 +5,7 @@ import multiprocessing
 import os
 from pathlib import Path
 import sys
+from graphmath import __version__
 
 
 def main():
@@ -25,7 +26,7 @@ def main():
     app.setApplicationName("MathLab")
     from graphmath.app.localization import install_ukrainian
     install_ukrainian(app)
-    app.setApplicationVersion("1.1.4")
+    app.setApplicationVersion(__version__)
     app.setOrganizationName("GraphMath")
     app.setStyle("Fusion")
     output = Path(args.smoke_output)
@@ -40,12 +41,34 @@ def main():
         window.open_project(args.project)
     window.show()
     if args.smoke_test:
+        resource_root = Path(__file__).resolve().parents[1] / 'resources'
+        resource_checks = {
+            'icon': (resource_root / 'icon.ico').is_file(),
+            'translation': (resource_root / 'qtbase_uk.qm').is_file(),
+            'inter_fonts': all((resource_root / 'fonts' / f'Inter-{face}.ttf').is_file()
+                               for face in ('Regular', 'Medium', 'SemiBold')),
+        }
+        def ready():
+            window.canvas.flush_refresh()
+            app.processEvents()
+            (output / 'ready.json').write_text(json.dumps({
+                'status': 'ready', 'version': __version__,
+                'bundle_root': str(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else None,
+                'default_settings_file': QSettings('GraphMath', 'GraphMath').fileName(),
+                'default_settings_format': 'native',
+                'smoke_settings_file': window.settings.fileName(),
+                'resource_checks': resource_checks, 'ui_font': app.mathlab_ui_font,
+                'qt_backend': app.platformName(),
+            }), encoding='utf-8')
+            QTimer.singleShot(600, smoke)
+        QTimer.singleShot(0, ready)
         def smoke():
             from graphmath.persistence.projects import save, load
             from graphmath.plotting.export import export_graph
             from graphmath.core.expressions import evaluate
             import numpy as np
             try:
+                assert all(resource_checks.values()), resource_checks
                 from PySide6.QtGui import QRawFont
                 from graphmath.ui.theme import UI_REQUIRED_GLYPHS
                 assert all(QRawFont.fromFont(window.font()).glyphIndexesForString(UI_REQUIRED_GLYPHS)), "UI glyph coverage failed"
@@ -66,9 +89,14 @@ def main():
                                      ('exponential', {'a': 1., 'b': .5, 'c': 0.}),
                                      ('logarithmic', {'a': 1., 'b': 2., 'h': 1., 'k': 0.})]:
                     window.mode_selector.setCurrentIndex(window.mode_selector.findData(mode))
-                    for name,value in values.items():window.lab_coefficient_changed(name,value)
+                    for name,value in values.items():window.learning.controls[name].value.setValue(value)
                     window.canvas.flush_refresh()
                     assert window.current_function().parameters['b'].value == values['b']
+                    for name,value in values.items():
+                        assert window.current_function().parameters[name].value == value
+                    control = window.learning.controls['a']
+                    control.slider.setValue(control.ticks.index(1.5))
+                    assert window.current_function().parameters['a'].value == 1.5
                 window.mode_selector.setCurrentIndex(window.mode_selector.findData('custom'))
                 window.edit_function(window.project.selected,'x^2 - 4')
                 window.canvas.refresh()
@@ -89,7 +117,7 @@ def main():
                 window.toggle_theme()
                 app.processEvents()
                 window.grab().save(str(output / "workspace-dark.png"))
-                (output / "result.json").write_text(json.dumps({"status": "passed", "version": "1.1.4", "exports": ["png", "svg", "pdf"], "project_roundtrip": True, "analysis_subprocess": True, "laboratory_modes": list(LABS), "application": "MathLab", "ui_font": app.mathlab_ui_font, "ui_glyph_coverage": True}), encoding="utf-8")
+                (output / "result.json").write_text(json.dumps({"status": "passed", "version": __version__, "exports": ["png", "svg", "pdf"], "project_roundtrip": True, "analysis_subprocess": True, "laboratory_modes": list(LABS), "application": "MathLab", "ui_font": app.mathlab_ui_font, "ui_glyph_coverage": True, 'coefficient_controls': True, 'resource_checks': resource_checks, 'persistent_project_file': str((output / 'workspace.graphmath').resolve()), 'qt_backend': app.platformName()}), encoding="utf-8")
                 window.flush_inputs()
                 window.saved_state = window.serialized()
                 window.close()
@@ -98,5 +126,4 @@ def main():
                 import traceback
                 (output / "error.txt").write_text(traceback.format_exc(), encoding="utf-8")
                 app.exit(1)
-        QTimer.singleShot(600, smoke)
     return app.exec()

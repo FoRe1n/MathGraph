@@ -15,7 +15,10 @@ if not list(root.rglob(platform_plugin)):
     raise SystemExit(f'Missing Qt platform plugin: {platform_plugin}')
 if any(not list(root.rglob(name)) for name in ('DejaVuSans.ttf','DejaVuSans-Bold.ttf','DejaVuSans-Oblique.ttf','DejaVuSans-BoldOblique.ttf')):
     raise SystemExit('Missing MathText fonts')
-print('Verified executable, Qt platform plugin, MathText fonts and notices.')
+for name in ('Inter-Regular.ttf','Inter-Medium.ttf','Inter-SemiBold.ttf','Inter-OFL.txt','icon.ico'):
+    if not any(path.is_file() and path.stat().st_size for path in root.rglob(name)):
+        raise SystemExit('Missing application resource: '+name)
+print('Verified executable, Qt platform plugin, Inter/MathText fonts, icon and notices.')
 
 if not list(root.rglob('qtbase_uk.qm')):
     raise SystemExit('Missing Ukrainian Qt dialog translations')

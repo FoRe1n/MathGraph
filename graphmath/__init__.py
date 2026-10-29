@@ -1,2 +1,2 @@
 """GraphMath's engine is usable without importing Qt."""
-__version__ = "1.1.4"
+__version__ = "1.1.5"

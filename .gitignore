@@ -4,5 +4,7 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+dist-onefile/
+.benchmark-baseline/
 *.egg-info/
 artifacts/
