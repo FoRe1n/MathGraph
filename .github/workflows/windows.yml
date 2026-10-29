@@ -32,7 +32,11 @@ jobs:
       - name: Install verified locked dependencies
         run: python -m pip install --require-hashes -r requirements-windows.lock
       - name: Test mathematics, project files and desktop workflows
+        id: tests
         run: python -m pytest -q --junitxml=artifacts/tests.xml
+      - name: Report actual test failures in public annotations
+        if: always() && steps.tests.outcome != 'skipped'
+        run: python scripts/report_test_failures.py artifacts/tests.xml
       - name: Check out the published baseline for same-runner comparisons
         uses: actions/checkout@v4
         with:

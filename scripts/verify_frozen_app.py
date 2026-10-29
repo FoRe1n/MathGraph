@@ -49,12 +49,12 @@ def report_failure(output: Path, error: Exception) -> None:
             try:
                 with path.open('rb') as stream:
                     stream.seek(max(0, path.stat().st_size-4000))
-                    tail = stream.read().decode('utf-8', errors='replace').strip()
+                    tail = stream.read().decode('utf-8', errors='replace').replace('\r\n', '\n').replace('\r', '\n').strip()
             except OSError:
                 continue
             if tail:
                 details.append(f'{path.relative_to(output)}:\n{tail}')
-    diagnostic = details[0]
+    diagnostic = details[0].replace('\r\n', '\n').replace('\r', '\n')
     if len(details) > 1:
         diagnostic += '\n\n'+'\n\n'.join(details[1:])[-12000:]
     escaped = diagnostic.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')

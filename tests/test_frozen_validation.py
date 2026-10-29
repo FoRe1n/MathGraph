@@ -32,10 +32,12 @@ def test_missing_system_root_has_actionable_error():
         module.windows_environment({'PATH': 'external-python'}, 'offscreen')
 
 
-def test_failed_packaged_check_emits_escaped_annotation_and_diagnostics(tmp_path, capsys, monkeypatch):
+@pytest.mark.parametrize('newline', [b'\n', b'\r\n'], ids=['LF', 'CRLF'])
+def test_failed_packaged_check_emits_escaped_annotation_and_diagnostics(tmp_path, capsys, monkeypatch, newline):
     output = tmp_path/'validation'
     run = output/'onedir-run-1'; run.mkdir(parents=True)
-    (run/'stderr.log').write_text('Qt failed: 50%\nsecond line', encoding='utf-8')
+    raw_stderr = b'Qt failed: 50%'+newline+b'second line'
+    (run/'stderr.log').write_bytes(raw_stderr)
     (run/'error.txt').write_text('Smoke diagnostic', encoding='utf-8')
     summary = tmp_path/'summary.md'
     monkeypatch.setenv('GITHUB_STEP_SUMMARY', str(summary))
@@ -45,6 +47,7 @@ def test_failed_packaged_check_emits_escaped_annotation_and_diagnostics(tmp_path
     assert '50%25%0Asecond line' in printed
     assert 'Smoke diagnostic' in printed
     assert printed.count('\n') == 1
+    assert (run/'stderr.log').read_bytes() == raw_stderr
     failure = json.loads((output/'failure.json').read_text())
     assert failure['status'] == 'failed'
     assert 'did not reach readiness' in failure['diagnostics']
