@@ -1,0 +1,241 @@
+{
+  "status": "passed",
+  "version": "1.1.5",
+  "portable": {
+    "sha256": "e5fb0daaf7782d167a5c94577d1eafcc51714059502dd0b6ba165bd3b88ef9ea",
+    "members": 1574,
+    "windows_amd64": true,
+    "bytes": 95289158,
+    "embedded_windows_icon": true
+  },
+  "onefile": {
+    "status": "passed",
+    "sha256": "dea683235a83378b9ef0ffad8fd24ebeaa4064dc6a39f008840ff00cf5c18298",
+    "bytes": 92946235,
+    "windows_amd64": true,
+    "embedded_members": 1492,
+    "required_resources": [
+      "python312.dll",
+      "PySide6/plugins/platforms/qwindows.dll",
+      "graphmath/resources/icon.ico",
+      "graphmath/resources/qtbase_uk.qm",
+      "graphmath/resources/licenses/Inter-OFL.txt",
+      "licenses/inventory.json",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md",
+      "graphmath/resources/fonts/Inter-Regular.ttf",
+      "graphmath/resources/fonts/Inter-Medium.ttf",
+      "graphmath/resources/fonts/Inter-SemiBold.ttf",
+      "matplotlib/mpl-data/fonts/ttf/DejaVuSans.ttf",
+      "matplotlib/mpl-data/fonts/ttf/DejaVuSans-Bold.ttf",
+      "matplotlib/mpl-data/fonts/ttf/DejaVuSans-Oblique.ttf",
+      "matplotlib/mpl-data/fonts/ttf/DejaVuSans-BoldOblique.ttf"
+    ],
+    "required_modules": [
+      "graphmath.app.main",
+      "numpy",
+      "sympy",
+      "pyqtgraph",
+      "PySide6",
+      "matplotlib"
+    ],
+    "embedded_windows_icon": true,
+    "inter_fonts_match_source": true
+  },
+  "windows_tests": {
+    "tests": 511,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "source_smoke": {
+    "status": "passed",
+    "version": "1.1.5",
+    "exports": [
+      "png",
+      "svg",
+      "pdf"
+    ],
+    "project_roundtrip": true,
+    "analysis_subprocess": true,
+    "laboratory_modes": [
+      "quadratic",
+      "exponential",
+      "logarithmic",
+      "linear",
+      "direct",
+      "constant",
+      "vertical",
+      "inverse",
+      "square",
+      "vertex",
+      "cubic",
+      "absolute",
+      "sqrt",
+      "sqrt_left",
+      "sqrt_down",
+      "exponential_shift",
+      "logarithmic_scale",
+      "sin",
+      "cos",
+      "tan"
+    ],
+    "application": "MathLab",
+    "ui_font": "Inter",
+    "ui_glyph_coverage": true,
+    "coefficient_controls": true,
+    "resource_checks": {
+      "icon": true,
+      "translation": true,
+      "inter_fonts": true
+    },
+    "persistent_project_file": "D:\\a\\MathGraph\\MathGraph\\artifacts\\source-smoke\\workspace.graphmath",
+    "qt_backend": "offscreen"
+  },
+  "packaged_validation": {
+    "status": "passed",
+    "version": "1.1.5",
+    "platform": "native Windows; offscreen and windows QPA",
+    "startup_definition": "Process launch to first prepared window; includes imports and one-file extraction.",
+    "cache_note": "Launch 1 is offscreen, launch 2 uses the Windows platform plugin. Compare formats within a backend; OS/antivirus cache state is not controlled.",
+    "launches": [
+      {
+        "status": "passed",
+        "kind": "onedir",
+        "version": "1.1.5",
+        "qt_backend": "offscreen",
+        "ready_ms": 1823.821,
+        "total_smoke_ms": 6762.915,
+        "executable_bytes": 17550315,
+        "outside_checkout": true,
+        "python_removed_from_path": true,
+        "temporary_bundle_cleaned": null,
+        "project_and_settings_survived_outside_bundle": true,
+        "ready": {
+          "status": "ready",
+          "version": "1.1.5",
+          "bundle_root": "D:\\a\\MathGraph\\MathGraph\\dist\\MathLab\\_internal",
+          "default_settings_file": "\\HKEY_CURRENT_USER\\Software\\GraphMath\\GraphMath",
+          "default_settings_format": "native",
+          "smoke_settings_file": "D:/a/MathGraph/MathGraph/artifacts/packaged-validation/onedir-run-1/smoke-settings.ini",
+          "resource_checks": {
+            "icon": true,
+            "translation": true,
+            "inter_fonts": true
+          },
+          "ui_font": "Inter",
+          "qt_backend": "offscreen"
+        },
+        "launch_number": 1
+      },
+      {
+        "status": "passed",
+        "kind": "onedir",
+        "version": "1.1.5",
+        "qt_backend": "windows",
+        "ready_ms": 3355.382,
+        "total_smoke_ms": 8168.624,
+        "executable_bytes": 17550315,
+        "outside_checkout": true,
+        "python_removed_from_path": true,
+        "temporary_bundle_cleaned": null,
+        "project_and_settings_survived_outside_bundle": true,
+        "ready": {
+          "status": "ready",
+          "version": "1.1.5",
+          "bundle_root": "D:\\a\\MathGraph\\MathGraph\\dist\\MathLab\\_internal",
+          "default_settings_file": "\\HKEY_CURRENT_USER\\Software\\GraphMath\\GraphMath",
+          "default_settings_format": "native",
+          "smoke_settings_file": "D:/a/MathGraph/MathGraph/artifacts/packaged-validation/onedir-run-2/smoke-settings.ini",
+          "resource_checks": {
+            "icon": true,
+            "translation": true,
+            "inter_fonts": true
+          },
+          "ui_font": "Inter",
+          "qt_backend": "windows"
+        },
+        "launch_number": 2
+      },
+      {
+        "status": "passed",
+        "kind": "onefile",
+        "version": "1.1.5",
+        "qt_backend": "offscreen",
+        "ready_ms": 5085.359,
+        "total_smoke_ms": 10759.452,
+        "executable_bytes": 92946235,
+        "outside_checkout": true,
+        "python_removed_from_path": true,
+        "temporary_bundle_cleaned": true,
+        "project_and_settings_survived_outside_bundle": true,
+        "ready": {
+          "status": "ready",
+          "version": "1.1.5",
+          "bundle_root": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\_MEI76882",
+          "default_settings_file": "\\HKEY_CURRENT_USER\\Software\\GraphMath\\GraphMath",
+          "default_settings_format": "native",
+          "smoke_settings_file": "D:/a/MathGraph/MathGraph/artifacts/packaged-validation/onefile-run-1/smoke-settings.ini",
+          "resource_checks": {
+            "icon": true,
+            "translation": true,
+            "inter_fonts": true
+          },
+          "ui_font": "Inter",
+          "qt_backend": "offscreen"
+        },
+        "launch_number": 1
+      },
+      {
+        "status": "passed",
+        "kind": "onefile",
+        "version": "1.1.5",
+        "qt_backend": "windows",
+        "ready_ms": 4856.547,
+        "total_smoke_ms": 10270.087,
+        "executable_bytes": 92946235,
+        "outside_checkout": true,
+        "python_removed_from_path": true,
+        "temporary_bundle_cleaned": true,
+        "project_and_settings_survived_outside_bundle": true,
+        "ready": {
+          "status": "ready",
+          "version": "1.1.5",
+          "bundle_root": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\_MEI59962",
+          "default_settings_file": "\\HKEY_CURRENT_USER\\Software\\GraphMath\\GraphMath",
+          "default_settings_format": "native",
+          "smoke_settings_file": "D:/a/MathGraph/MathGraph/artifacts/packaged-validation/onefile-run-2/smoke-settings.ini",
+          "resource_checks": {
+            "icon": true,
+            "translation": true,
+            "inter_fonts": true
+          },
+          "ui_font": "Inter",
+          "qt_backend": "windows"
+        },
+        "launch_number": 2
+      }
+    ]
+  },
+  "screenshots": {
+    "screenshots": {
+      "count": 75,
+      "dpr": 1.0,
+      "glyph_checks": "passed"
+    },
+    "screenshots-dpi125": {
+      "count": 13,
+      "dpr": 1.25,
+      "glyph_checks": "passed"
+    },
+    "screenshots-dpi150": {
+      "count": 13,
+      "dpr": 1.5,
+      "glyph_checks": "passed"
+    }
+  },
+  "source_commit": "3c27c2a014a6f43cc9b3326069a3ecad39dc01dd",
+  "tag": "mathlab-v1.1.5",
+  "workflow_url": "https://github.com/FoRe1n/MathGraph/actions/runs/40896864509",
+  "validation_zip_crc_checked": true
+}

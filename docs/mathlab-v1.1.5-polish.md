@@ -155,7 +155,102 @@ and extraction plus up to 25 ms polling granularity. They are not hardware first
 frame timings or controlled cold/warm measurements. Compare formats within the
 same Qt backend. One-file extraction on every launch can increase startup time.
 
-Final tagged-run results, actual file sizes/checksums/startup measurements and
-public download verification are recorded below only after those checks finish.
-Builds are unsigned; antivirus reputation and physical Windows 11 monitor,
-ClearType/DPI/compositor behavior remain outside automated CI verification.
+## Verified published release
+
+The [tagged Windows run](https://github.com/FoRe1n/MathGraph/actions/runs/40896864509)
+completed successfully and published [MathLab v1.1.5](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.5),
+from source `3c27c2a014a6f43cc9b3326069a3ecad39dc01dd`.
+Every build/release step reports success. The public application assets,
+checksums and validation ZIP were then downloaded independently.
+
+- [Single-file Windows x64 EXE](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.5/MathLab-v1.1.5-Windows-x64-OneFile.exe):
+  **92,946,235 bytes** (92.95 MB / 88.64 MiB). Run it directly; no support folder
+  or external Python is required. All 1,492 embedded archive entries, dependency
+  modules and required resources were inspected. Inter font bytes match the
+  committed upstream files exactly. The PE header is AMD64 and has actual Windows
+  icon/group-icon resources.
+- [Portable Windows x64 ZIP](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.5/MathLab-v1.1.5-Windows-x64.zip):
+  **95,289,158 bytes** (95.29 MB). Extract the entire folder and run `MathLab.exe`.
+  All **1,574 entries** passed CRC/safe-path checks; the AMD64 executable, embedded
+  Windows icon, runtime, fonts, translations, licences and guide are present.
+- [Checksums](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.5/SHA256SUMS.txt)
+  match both downloaded binaries. EXE SHA256:
+  `dea683235a83378b9ef0ffad8fd24ebeaa4064dc6a39f008840ff00cf5c18298`.
+  ZIP SHA256: `e5fb0daaf7782d167a5c94577d1eafcc51714059502dd0b6ba165bd3b88ef9ea`.
+- [Validation ZIP](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.5/MathLab-v1.1.5-validation.zip)
+  passed independent CRC/path checks. Its JUnit XML reports **511 Windows tests,
+  zero failures, errors or skips**, matching the final Linux full-suite result.
+  All 101 captures passed, at recorded DPR 1.0/1.25/1.5, with actual control-glyph
+  checks and zero missing probe glyphs. Every source/frozen smoke result passed.
+
+The downloaded native PNGs were visually inspected, including the one-file EXE
+running through the real Windows platform plugin. Ukrainian text, fallback
+symbols, coefficient controls, selector selection and explanation paragraphs are
+readable. The native packaged smoke uses an artificially populated twenty-template
+project; its many visible curves are test data, not a default workspace redesign.
+
+### Native startup measurements
+
+Windows Server 2022 x64, Python 3.12.10 build toolchain. Every cell is an actual
+process launch, outside the checkout and without Python on PATH. Timings include
+extraction/imports and end at the prepared-window readiness marker.
+
+| Qt platform | Portable folder, ms | Single-file EXE, ms |
+| --- | ---: | ---: |
+| offscreen | 1,823.821 | 5,085.359 |
+| windows (normal Windows plugin) | 3,355.382 | 4,856.547 |
+
+The normal Windows-plugin difference was **1,501.165 ms**; extraction is a real
+one-file startup tradeoff. These are individual CI observations with uncontrolled
+OS/antivirus caches, not guaranteed consumer startup times or cold/warm pairs.
+Both one-file temporary extraction directories were removed after exit. Saved
+projects/isolated INI settings survived outside them; default native registry
+storage was checked separately.
+
+### Same-runner Windows performance comparison
+
+The published v1.1.4 source and final source ran serially on this same Windows
+runner with identical drivers: 30 actions/400 prolonged steps for the basic
+driver and 20 actions per extended scenario. Offscreen measurements are separate
+from the native `windows` plugin startup checks and are **not hardware FPS**.
+
+| Median / p95 milliseconds | v1.1.4 | v1.1.5 |
+| --- | ---: | ---: |
+| Five-function pan | 21.213 / 21.549 | 21.431 / 22.137 |
+| Learning slider | 3.954 / 6.435 | 4.191 / 8.042 |
+| Existing-template switch | 35.299 / 51.093 | 39.619 / 61.456 |
+| Custom formula update | 10.508 / 27.234 | 10.762 / 27.340 |
+| Editor/analysis panels | 14.347 / 18.572 | 15.017 / 20.024 |
+| Actual Qt drag gesture | 19.296 / 21.992 | 20.161 / 21.739 |
+| Theme change | 79.505 / 92.536 | 112.427 / 121.821 |
+| Repeated zoom | 11.695 / 12.736 | 11.804 / 12.437 |
+| Resize | 17.481 / 19.652 | 18.253 / 20.232 |
+
+Pan/slider median differences were 0.218/0.237 ms in these samples. The larger
+**32.922 ms theme-change cost** and 4.320 ms template-change cost are retained and
+associated with the requested typography/wrapped-paragraph layout update; the
+diagnostics above do not isolate every component's contribution. No numerical
+or rendering optimization was removed to obtain this presentation. Theme changes
+reapply global text styling and layout; they are not continuous drag frames.
+This is a documented UI cost, not a claim of zero degradation in every workload.
+The final Windows 400-step run retained one curve/cache entry, grew RSS by 57,344
+bytes and reported no callback errors.
+
+Raw public evidence and native screenshots:
+
+- [Verification summary](performance/mathlab-v1.1.5-public-verification.json)
+- [Native baseline interactions](performance/mathlab-v1.1.5-windows-baseline-interaction.json)
+- [Native final interactions](performance/mathlab-v1.1.5-windows-interaction-benchmark.json)
+- [Native baseline extended workloads](performance/mathlab-v1.1.5-windows-baseline-stabilization.json)
+- [Native final extended workloads](performance/mathlab-v1.1.5-windows-stabilization-benchmark.json)
+
+![Native Windows startup](screenshots/mathlab-1.1.5-windows/startup.png)
+![Native Windows grouped selector](screenshots/mathlab-1.1.5-windows/dropdown-light.png)
+![Native Windows dark selection](screenshots/mathlab-1.1.5-windows/dropdown-dark-150.png)
+![One-file EXE through Windows Qt plugin](screenshots/mathlab-1.1.5-windows/onefile-native-dark.png)
+
+Builds remain unsigned. Antivirus reputation, physical Windows 11 monitor,
+ClearType/DPI/compositor behavior and hardware FPS are not established by these
+checks. Anonymous GitHub access exposed step conclusions, public annotations and
+published evidence, but not complete raw runner logs. No physical Windows 11 or
+60 FPS claim is made. No critical packaging failure remains in the verified runs.

@@ -1,10 +1,10 @@
-# MathLab 1.1.4
+# MathLab 1.1.5
 
 An offline Ukrainian mathematics laboratory for high school students, evolved
 incrementally from GraphMath in the existing **FoRe1n/MathGraph** repository.
 Choose a function, move its coefficients, and see both the curve and an explanation.
 
-![MathLab quadratic laboratory on Windows](docs/screenshots/mathlab-1.1.4-windows/startup.png)
+![MathLab quadratic laboratory on Windows](docs/screenshots/mathlab-1.1.5-windows/startup.png)
 
 ## MathLab 1.1 changes
 
@@ -24,31 +24,44 @@ Coordinate ranges and point inspection live in the collapsed **Діапазон 
 panel. Changing coefficients preserves zoom and pan. Existing multiple-function
 editing, analysis, colors, visibility, history, themes and exports remain available.
 
-The v1.1.4 stabilization pass corrects mathematical domains and explanations,
-discontinuities, parameter precision/undo, damaged-file handling, atomic exports
-and Windows font rendering. All twenty templates and version-1 projects remain.
-See the [final audit, measurements and limitations](docs/mathlab-v1.1.4-audit.md).
+Version 1.1.5 adds focused typography and packaging polish: bundled OFL-licensed
+Inter, clearer coefficient/explanation spacing, distinct nonselectable dropdown
+headings and a verified single-file EXE alongside the portable ZIP. The redundant
+introductory instruction is removed. Mathematical algorithms, graph interaction,
+custom editing and all twenty templates remain unchanged.
+See the [polish audit, measurements and limits](docs/mathlab-v1.1.5-polish.md).
+The previous [v1.1.4 stabilization audit](docs/mathlab-v1.1.4-audit.md) documents
+the mathematical and reliability corrections retained by this version.
 
 ## Windows distribution
 
-**[Download MathLab v1.1.4 for Windows x64 (ZIP)](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.4/MathLab-v1.1.4-Windows-x64.zip)**
-([release, checksums and validation evidence](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.4)).
-Extract the entire folder and double-click **MathLab.exe**. Python is not required.
-[Native Windows release CI](https://github.com/FoRe1n/MathGraph/actions/runs/40204393173)
-passed **476 tests**, benchmarks, 61 real Qt captures, source/frozen smoke and
-archive verification. The frozen application ran outside the checkout with
-Python removed from PATH. The public ZIP was independently downloaded: SHA256,
-all 1,540 member CRCs, bundled runtime/fonts and Windows AMD64 executable were
-verified. Actual Windows screenshots were inspected for readable Ukrainian text.
+- **[Single-file MathLab v1.1.5 EXE](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.5/MathLab-v1.1.5-Windows-x64-OneFile.exe)** — 92.95 MB; run directly, with no support folder.
+- **[Portable MathLab v1.1.5 ZIP](https://github.com/FoRe1n/MathGraph/releases/download/mathlab-v1.1.5/MathLab-v1.1.5-Windows-x64.zip)** — 95.29 MB; extract the entire folder and launch **MathLab.exe** beside `_internal`.
 
-SHA256: `e7812c63006be5d002c5e10418050d464dd1fc634c4a489ad709380dd97a0a6f`.
-These checks used Windows Server 2022 offscreen; physical Windows 11 DPI,
-compositor behavior and hardware FPS remain unverified. Builds are unsigned.
+Neither format requires Python. One-file startup extracts libraries temporarily;
+settings and saved projects stay outside that directory. On the native Windows
+runner, launch to a prepared window took **4.86 s** for one-file and **3.36 s** for
+the folder build using the normal Windows Qt plugin. These are individual CI
+observations, with uncontrolled OS/antivirus cache state.
 
-The [v1.1.0 release](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.0)
-is preserved. Intermediate stabilization releases v1.1.1–v1.1.3 are superseded
-after independent visual and parameter-locale checks exposed further defects;
-use v1.1.4 for testing.
+[Release, checksums and validation evidence](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.5).
+[Native Windows CI](https://github.com/FoRe1n/MathGraph/actions/runs/40896864509)
+passed **511 tests**, comparable benchmarks and **101 real Qt captures** at
+100/125/150% device scaling. Both packaged formats passed offscreen and real
+Windows-plugin smoke checks outside the checkout with Python removed from PATH.
+The public EXE/ZIP/evidence were independently downloaded and verified: SHA256,
+all 1,574 ZIP entries, embedded modules/fonts/licences, AMD64 executables and
+Windows icon resources. Native screenshots render readable Ukrainian text.
+
+These checks used Windows Server 2022. Physical Windows 11 monitor/ClearType,
+antivirus reputation and hardware FPS remain unverified. Builds are unsigned.
+The audit records measured typography/layout costs, including slower theme
+changes; it makes no blanket performance-improvement claim.
+
+The [v1.1.4](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.4) and
+[v1.1.0](https://github.com/FoRe1n/MathGraph/releases/tag/mathlab-v1.1.0) releases
+are preserved. Intermediate v1.1.1–v1.1.3 stabilization releases are superseded;
+use v1.1.5 for testing.
 
 ### Preserved MathLab 1.0 release
 
@@ -126,6 +139,7 @@ is retained; its default distribution is now `MathLab`.
 - [MathLab validation and changed files](docs/mathlab-validation.md)
 - [Performance measurements](docs/mathlab-performance.md)
 - [Final v1.1.4 stabilization audit](docs/mathlab-v1.1.4-audit.md)
+- [v1.1.5 typography and single-file validation](docs/mathlab-v1.1.5-polish.md)
 - [Windows build and release](docs/windows-build.md)
 - [Original GraphMath validation](docs/validation.md)
 
